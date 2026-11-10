@@ -14,13 +14,13 @@ import NodeAnalysis from "../components/NodeAnalysis";
 import { graphMetrics } from "../lib/analytics";
 import type { EdgeType, NodeType, RNode, Activity } from "../lib/types";
 
-/* ---------- type system (warm, readable on white) ---------- */
+/* ---------- type system (bright on the dark stage) ---------- */
 const C: Record<NodeType, string> = {
-  paper: "#6B4BCE", dataset: "#245CB3", code_repo: "#446161", code_file: "#536A6A",
-  note: "#946700", webpage: "#2F5FB0", question: "#9C6A00", experiment: "#55700A",
-  result: "#157A4A", error: "#B52F2F", fix: "#157A4A", conclusion: "#6240B8",
+  paper: "#B7A4FF", dataset: "#7AA2FF", code_repo: "#8FD3C7", code_file: "#9ED0CF",
+  note: "#F2B64B", webpage: "#82AAFF", question: "#F2B64B", experiment: "#B6D95C",
+  result: "#82E78F", error: "#FF937A", fix: "#82E78F", conclusion: "#C4A7FF",
 };
-const ACCENT = "#E8532A";
+const ACCENT = "#F3703F";
 const NODE_TYPES: NodeType[] = ["paper", "dataset", "code_repo", "code_file", "note", "webpage", "question", "experiment", "result", "error", "fix", "conclusion"];
 const LABEL: Record<EdgeType, string> = {
   supports: "supports", references: "references", uses: "uses", investigates: "investigates",
@@ -156,8 +156,8 @@ export default function Canvas() {
           id: e.id, source: e.source, target: e.target,
           className: dim ? "cv-dim" : "",
           animated: e.type === "produces",
-          style: { stroke: on ? "rgba(232,83,42,.82)" : "rgba(74,61,50,.30)", strokeWidth: on ? 1.9 : 1.3 },
-          markerEnd: { type: MarkerType.ArrowClosed, width: 13, height: 13, color: on ? "rgba(232,83,42,.82)" : "rgba(74,61,50,.34)" },
+          style: { stroke: on ? "rgba(243,112,63,.9)" : "rgba(244,241,236,.18)", strokeWidth: on ? 1.9 : 1.3 },
+          markerEnd: { type: MarkerType.ArrowClosed, width: 13, height: 13, color: on ? "rgba(243,112,63,.9)" : "rgba(244,241,236,.22)" },
         } as RFEdge;
       }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -398,11 +398,11 @@ export default function Canvas() {
             connectionLineStyle={{ stroke: ACCENT, strokeWidth: 1.6, strokeDasharray: "5 4" }}
             proOptions={{ hideAttribution: false }}
           >
-            <Background variant={BackgroundVariant.Dots} gap={26} size={1} color="rgba(120,98,80,.20)" />
+            <Background variant={BackgroundVariant.Dots} gap={26} size={1} color="rgba(255,255,255,.13)" />
             <Controls showInteractive={false} position="bottom-left" />
             <MiniMap pannable zoomable position="bottom-right"
               nodeColor={(n: any) => C[(n.data?.node?.type as NodeType) || "note"]}
-              nodeStrokeWidth={0} maskColor="rgba(247,242,236,.72)"
+              nodeStrokeWidth={0} maskColor="rgba(23,22,20,.72)"
               style={{ width: 132, height: 88 }} />
           </ReactFlow>
 
@@ -468,7 +468,7 @@ export default function Canvas() {
             {edge && (
               <>
                 <div className="cv-insp-h">
-                  <span className="cv-tag" style={{ color: "#6E6055" }}><i style={{ background: ACCENT }} />connection</span>
+                  <span className="cv-tag" style={{ color: "#A8A39C" }}><i style={{ background: ACCENT }} />connection</span>
                   <button className="cv-x" onClick={() => setSelEdge(null)} aria-label="Close inspector">✕</button>
                 </div>
                 <div className="cv-insp-body">

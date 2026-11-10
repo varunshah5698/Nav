@@ -31,7 +31,7 @@ export default function Shell({children}:{children:React.ReactNode}){
   const nav=useNavigate(); const [open,setOpen]=useState(false);
   const [q,setQ]=useState("");
   const path=useLocation().pathname;
-  const dash=path.startsWith("/app/dashboard")||path.startsWith("/app/sources");
+  const dash=path.startsWith("/app/dashboard")||path.startsWith("/app/sources")||path.startsWith("/app/canvas");
   const initials=(user?.name||"R").split(/\s+/).map(p=>p[0]).slice(0,2).join("").toUpperCase();
   const closeMenu=()=>document.querySelector<HTMLDetailsElement>("details.rg-profile[open]")?.removeAttribute("open");
   const endSession=async()=>{ closeMenu(); await flushCloud(); await signOut(); nav("/login"); };
