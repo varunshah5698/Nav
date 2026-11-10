@@ -1,7 +1,7 @@
 export type Role = "owner" | "editor" | "viewer";
 export type NodeType = "paper"|"dataset"|"code_repo"|"code_file"|"note"|"webpage"|"question"|"experiment"|"result"|"error"|"fix"|"conclusion";
 export type EdgeType = "supports"|"references"|"uses"|"investigates"|"produces"|"resolves"|"contradicts"|"relates";
-export interface User { id:string; name:string; email:string; passHash:string; salt:string; createdAt:string }
+export interface User { id:string; name:string; email:string; image?:string|null; createdAt:string }
 export interface Workspace { id:string; name:string; description:string; ownerId:string; createdAt:string; demo?:boolean }
 export interface Membership { workspaceId:string; userId:string; role:Role }
 export interface RNode {

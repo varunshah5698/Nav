@@ -20,6 +20,69 @@ Register (any email) → demo workspace seeds automatically. Login persists loca
 - **Collab**: owner/editor/viewer (enforced), access roster with local-only invites, workspace activity, export studio (Report MD, BibTeX, Graph JSON, Exp CSV) with live preview, size/line count and export history. Report sections and sources are selectable; every file is generated in the browser.
 - **Dashboard**: real KPIs + activity/distribution/outcome/agent/graph panels, range filter, empty states, no fabricated deltas.
 
+## Authentication & cloud sync (Convex Auth + Google)
+
+Convex is the authentication authority and the cloud store. There is no local
+account system: `users`/password hashes were removed, and the store only mirrors
+the identity returned by `ctx.auth.getUserIdentity()`.
+
+```
+Google OAuth -> convex.site/api/auth/callback/google -> Convex Auth session
+   -> useConvexAuth()/users.me -> store.startSession(server identity)
+   -> snapshots.get/save (ownership from getAuthUserId, never from the client)
+```
+
+- `convex/auth.ts` — Google provider (`@auth/core`).
+- `convex/http.ts` — `/api/auth/*` HTTP routes.
+- `convex/schema.ts` — `authTables` + `userSnapshots` (one per Convex user) +
+  legacy `snapshots` (kept read-only; never exposed by a function).
+- `convex/snapshots.ts` — `get`/`save` take **no userId**; unauthenticated calls throw.
+- `convex/users.ts` — `me` returns name/email/photo for the signed-in user.
+- `src/lib/useCloudSync.ts` — wipes cached data on sign-out, refuses snapshots whose
+  server-reported `userId` differs from the session, debounces saves, flushes on hide.
+- `src/components/Shell.tsx` — Google photo/name/email + real sign-out.
+- `src/pages/Auth.tsx` — Google-only sign-in; redirects authenticated visitors.
+
+### Google Cloud Console setup (one-time)
+
+1. Google Cloud Console → create/select a project → **Google Auth Platform**.
+2. Configure the consent screen (External), add your test users while in testing.
+3. **Clients → Create client → Web application**.
+   - Authorized JavaScript origin: `http://localhost:5173`
+     (add your production origin when you deploy).
+   - Authorized redirect URI: `https://canny-echidna-518.convex.site/api/auth/callback/google`
+     (that is the deployment's HTTP Actions URL + `/api/auth/callback/google`).
+4. Copy the Client ID and Client secret and set them on the Convex deployment:
+
+```bash
+npx convex env set AUTH_GOOGLE_ID <client-id>
+npx convex env set AUTH_GOOGLE_SECRET <client-secret>
+```
+
+Secrets live only in the Convex deployment environment — never in `.env.local`,
+never in the Vite bundle, never in git. Check `SITE_URL` matches the app origin
+(`http://localhost:5173` locally; `npx convex env set SITE_URL <prod-url>` for prod).
+
+### Client environment
+
+```bash
+# .env.local (gitignored)
+CONVEX_DEPLOYMENT=dev:canny-echidna-518
+CONVEX_DEPLOY_KEY=dev:canny-echidna-518|<token>   # CLI only
+VITE_CONVEX_URL=https://canny-echidna-518.convex.cloud
+```
+
+`npx convex deploy` pushes schema + functions. Documents are capped at 1 MiB;
+the client skips snapshots over ~900 KB with a console warning.
+
+### Data migration
+
+Legacy rows in the `snapshots` table (`<localUserId>:<workspaceId>`) are preserved
+but unreachable. On first Google sign-in, the browser's existing graph is uploaded
+to the authenticated user's `userSnapshots` document, so nothing in the current
+browser is lost. Signing out clears cached browser data; it reloads from Convex on
+the next sign-in, which is what makes cross-device sync work.
+
 ## Deploy (Freebuff Sites)
 Static build, published at <https://site-942642bb18134977bde5709248101d00.freebuff.page>. `sites/deploy.json` is the Sites manifest (`sites/worker.js` just serves `../dist`), and `sites/site.json` holds the project id and environment URLs. `npm run build` then deploy that manifest. `sites/worker.js` also serves the AI Analyst API (`GET /api/analyst/status`, `POST /api/analyst`) so the deployed site streams real answers: it reads `GROQ_API_KEY` from the Worker secret (Sites → Secrets, set per environment) and proxies Groq, rewriting SSE into the plain-text stream the client reads. The key never ships in the bundle — locally the same routes come from `vite.config.ts` and `backend/app/main.py`.
 
