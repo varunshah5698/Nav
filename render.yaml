@@ -36,6 +36,9 @@ services:
       # the dashboard and redeploy the static site.
       - key: VITE_API_URL
         value: https://researchgraph-api.onrender.com
+      # Public Convex deployment URL, inlined by Vite at build time.
+      - key: VITE_CONVEX_URL
+        value: https://canny-echidna-518.convex.cloud
 
   # ---------------------------------------------------------------------------
   # 2. API — FastAPI streaming proxy for Groq; the key never reaches the bundle.
