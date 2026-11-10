@@ -11,4 +11,10 @@ crons.hourly(
   internal.passwordReset.prune,
 );
 
+crons.hourly(
+  "prune invite email ledger",
+  { minuteUTC: 23 },
+  internal.inviteEmails.prune,
+);
+
 export default crons;

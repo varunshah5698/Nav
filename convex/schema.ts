@@ -2,6 +2,19 @@ import { defineSchema, defineTable } from "convex/server";
 import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 
+// Kept in step with UPLOAD_FORMATS in src/pages/Collaboration.tsx.
+const attachmentKind = v.union(
+  v.literal("pdf"),
+  v.literal("doc"),
+  v.literal("slides"),
+  v.literal("text"),
+  v.literal("sheet"),
+  v.literal("code"),
+  v.literal("quote"),
+  v.literal("image"),
+  v.literal("archive"),
+);
+
 export default defineSchema({
   ...authTables,
 
@@ -20,6 +33,29 @@ export default defineSchema({
     payload: v.string(),
     updatedAt: v.number(),
   }).index("by_key", ["key"]),
+
+  // Handoff files live in Convex file storage; this table is metadata only.
+  // Ownership is derived from the authenticated user, never client input.
+  attachments: defineTable({
+    userId: v.id("users"),
+    workspaceId: v.string(),
+    storageId: v.id("_storage"),
+    name: v.string(),
+    ext: v.string(),
+    kind: attachmentKind,
+    size: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_user_workspace_createdAt", ["userId", "workspaceId", "createdAt"])
+    .index("by_storage", ["storageId"]),
+
+  // Rate-limit ledger for invite emails. No recipient or message content.
+  inviteEmails: defineTable({
+    userId: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_user_createdAt", ["userId", "createdAt"])
+    .index("by_createdAt", ["createdAt"]),
 
   // Email OTP password reset. Only hashed identifiers and hashed OTPs are
   // stored; plaintext emails and codes never touch the database.

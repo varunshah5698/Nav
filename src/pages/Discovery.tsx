@@ -87,7 +87,7 @@ export default function Discovery() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [docs]);
   const mix = useMemo(() => index.map(([t, value]) => ({ type: t, name: KIND_LABEL[t] || t, value })), [index]);
-  const explore = useMemo(() => docs.slice(0, 6), [docs]);
+  const explore = useMemo(() => docs.slice(0, 8), [docs]);
   const prompts = useMemo(() => docs.slice(0, 3), [docs]);
   const resultTotal = res?.results.length || 0;
 
@@ -240,15 +240,14 @@ export default function Discovery() {
             <div><h2>Search activity</h2><p>Last 7 days</p></div>
             <span className="dc-p-badge">{week} this week</span>
           </div>
-          {logs.length
-            ? <div className="dc-bars" role="img" aria-label={vol.map(v => `${v.label}: ${v.value} search${v.value === 1 ? "" : "es"}`).join(", ")}>
-              {vol.map(v => <div key={v.key} className={`dc-bar-col${v.current ? " on" : ""}`} title={`${v.label}: ${v.value}`}>
-                <span className="dc-bar-n">{v.value || ""}</span>
-                <span className="dc-bar-track"><i style={{ height: `${Math.max(3, Math.round(v.value / volMax * 100))}%` }} /></span>
-                <span className="dc-bar-lbl">{v.label}</span>
-              </div>)}
-            </div>
-            : <div className="dc-inline-empty">Search activity appears after your first query.</div>}
+          <div className={`dc-bars${logs.length ? "" : " is-empty"}`} role="img" aria-label={vol.map(v => `${v.label}: ${v.value} search${v.value === 1 ? "" : "es"}`).join(", ")}>
+            {vol.map(v => <div key={v.key} className={`dc-bar-col${v.current ? " on" : ""}`} title={`${v.label}: ${v.value}`}>
+              <span className="dc-bar-n">{v.value || ""}</span>
+              <span className="dc-bar-track"><i style={{ height: `${Math.max(3, Math.round(v.value / volMax * 100))}%` }} /></span>
+              <span className="dc-bar-lbl">{v.label}</span>
+            </div>)}
+          </div>
+          {!logs.length && <p className="dc-bars-hint">No queries yet — the first search starts this 7-day history.</p>}
           <div className="dc-footrow"><span>Total <b>{logs.length}</b></span><span>Opened <b>{engaged}%</b></span><span>Zero <b>{zeroR}%</b></span></div>
         </section>
 
@@ -263,7 +262,15 @@ export default function Discovery() {
                 <span className="dc-query-q" title={l.query}>{l.query}</span><b>{l.results}</b>
               </div>)}
             </div>
-            : <div className="dc-inline-empty">Run a search to start the log.</div>}
+            : explore.length
+              ? <div className="dc-query-list">
+                <span className="dc-query-hint">Try one of these</span>
+                {explore.slice(0, 3).map(d => <button key={d.id} className="dc-query dc-query-suggest" onClick={() => run(d.title)}>
+                  <span className="dc-query-dot" data-on="no" />
+                  <span className="dc-query-q" title={d.title}>{d.title}</span><b>Search →</b>
+                </button>)}
+              </div>
+              : <div className="dc-inline-empty compact">Run a search to start the log.</div>}
         </section>
       </aside>
     </div>

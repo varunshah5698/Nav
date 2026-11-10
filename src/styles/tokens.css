@@ -45,7 +45,7 @@
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;font-family:var(--font);background:#1C1A18;color:var(--text);-webkit-font-smoothing:antialiased}
+body{margin:0;font-family:var(--font);background:#232220;color:var(--text);-webkit-font-smoothing:antialiased}
 a{color:inherit}
 button{font-family:inherit}
 ::selection{background:var(--lime)}

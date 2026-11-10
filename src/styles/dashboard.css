@@ -7,7 +7,7 @@
   --db-ink:#F3F1EA;--db-muted:#A8A69F;--db-dim:#8E8C85;
   --db-line:rgba(255,255,255,.09);--db-line-soft:rgba(255,255,255,.06);
   --db-orange:#F0805A;--db-orange-deep:#E26B43;--db-green:#6FD08C;
-  --db-glass:linear-gradient(180deg,rgba(255,255,255,.048),rgba(255,255,255,.024));
+  --db-glass:linear-gradient(180deg,rgba(255,255,255,.038),rgba(255,255,255,.020));
   --db-shadow:0 22px 50px -30px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.07);
   position:relative;display:flex;flex-direction:column;gap:16px;padding:24px;border-radius:28px;
   background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);
@@ -32,7 +32,7 @@
 .db-eyebrow::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--db-orange);box-shadow:0 0 0 3px rgba(240,128,90,.16)}
 .db-eyebrow .sep{display:inline-block;width:3px;height:3px;border-radius:50%;background:var(--db-dim);margin:0 1px}
 .db-eyebrow span+span{color:var(--db-dim)}
-.db-h1{font-size:27px;font-weight:650;letter-spacing:-.032em;line-height:1;margin:10px 0 0;color:#F7F5EE}
+.db-h1{font-size:32px;font-weight:650;letter-spacing:-.032em;line-height:1;margin:10px 0 0;color:#F7F5EE}
 .db-sub{margin:0;font-size:12px;line-height:1.5;color:var(--db-dim);max-width:62ch}
 .db-head-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .db-tabs{display:inline-flex;gap:3px;background:rgba(255,255,255,.05);border:1px solid var(--db-line);border-radius:999px;padding:4px}
@@ -54,14 +54,14 @@
 
 /* ---------- KPI tiles ---------- */
 .db-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
-.db-kpi{position:relative;overflow:hidden;background:var(--db-glass);border:1px solid var(--db-line);border-radius:18px;padding:15px 17px 16px;
+.db-kpi{position:relative;overflow:hidden;background:var(--db-glass);border:1px solid var(--db-line);border-radius:18px;padding:16px 18px 16px;
   display:flex;flex-direction:column;gap:13px;box-shadow:var(--db-shadow);transition:transform .2s ease,border-color .2s ease}
 .db-kpi:hover{transform:translateY(-1px);border-color:rgba(255,255,255,.16)}
 .db-kpi::after{content:"";position:absolute;right:-34px;top:-44px;width:116px;height:116px;border-radius:50%;pointer-events:none;
   background:radial-gradient(circle,rgba(240,128,90,.06),rgba(240,128,90,0) 68%)}
 .db-kpi-lbl{font-size:11.5px;font-weight:550;color:var(--db-muted);letter-spacing:.005em;position:relative;z-index:1}
 .db-kpi-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;position:relative;z-index:1}
-.db-kpi-row b{font-size:27px;font-weight:650;letter-spacing:-.035em;line-height:.95;color:#F7F5EE;font-variant-numeric:tabular-nums}
+.db-kpi-row b{font-size:28px;font-weight:650;letter-spacing:-.035em;line-height:.95;color:#F7F5EE;font-variant-numeric:tabular-nums}
 .db-delta{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;line-height:1;padding:4px 8px;border-radius:999px;
   background:rgba(111,208,140,.16);color:#93E7AB;white-space:nowrap;font-variant-numeric:tabular-nums}
 .db-delta svg{width:10px;height:10px;flex:none}

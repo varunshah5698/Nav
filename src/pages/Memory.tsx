@@ -201,6 +201,10 @@ export default function Memory() {
                 </li>)}
               </ul>
             </div> : <p className="mm-note">Nothing saved yet — the mix fills in as you log lessons.</p>}
+            {tags.size > 0 && <div className="mm-tagcloud">
+              <span className="mm-tagcloud-lbl">Frequent tags</span>
+              {[...tags].slice(0, 8).map(t => <button key={t} className={`mm-tagcloud-pill${q === t ? " on" : ""}`} onClick={() => setQ(q === t ? "" : t)}>#{t}</button>)}
+            </div>}
           </section>
 
           <section className="mm-panel">
@@ -337,8 +341,36 @@ export default function Memory() {
           </div>
           <p className="mm-note mm-health-note">Reuse rate is the share of memories recalled at least once. Nothing here is estimated.</p>
         </section>
+
+        <section className="mm-panel mm-protocol">
+          <div className="mm-p-head">
+            <div><h2>Recall protocol</h2><p>How a lesson returns before the next run.</p></div>
+            <span className="mm-signal">local</span>
+          </div>
+          <ol className="mm-protocol-list">
+            {[["Capture", "Log the config, error or fix"], ["Tag", "Attach the terms you will search later"], ["Match", "Rank against the next experiment"], ["Reuse", "Apply it and bump the counter"]].map(([t, d], i) => (
+              <li key={t}><span>{String(i + 1).padStart(2, "0")}</span><div><b>{t}</b><em>{d}</em></div></li>
+            ))}
+          </ol>
+        </section>
       </aside>
     </div>
+
+    <section className="mm-panel mm-pipeline" aria-label="How recall works">
+      <div className="mm-p-head">
+        <div><h2>Recall pipeline</h2><p>Everything is matched locally — no network, no model call.</p></div>
+        <span className="mm-signal">local</span>
+      </div>
+      <div className="mm-flow">
+        <div className="mm-flow-node"><span>01</span><div><b>Capture</b><em>Config · error · fix · finding</em></div></div>
+        <div className="mm-flow-line"><i /></div>
+        <div className="mm-flow-node"><span>02</span><div><b>Tag</b><em>Params, deps and terms</em></div></div>
+        <div className="mm-flow-line"><i /></div>
+        <div className="mm-flow-node"><span>03</span><div><b>Match</b><em>Score against the next run</em></div></div>
+        <div className="mm-flow-line"><i /></div>
+        <div className="mm-flow-node"><span>04</span><div><b>Reuse</b><em>Apply, then count the recall</em></div></div>
+      </div>
+    </section>
 
     {open && <NewMem onClose={() => setOpen(false)} onAdd={v => { add({ ...v, workspaceId: "" } as any); setOpen(false); }} />}
   </div>;

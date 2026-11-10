@@ -340,3 +340,14 @@
   .dc-ring,.dc-core,.dc-core::after,.dc-float,.dc-spark,.dc-scan,.dc-floor,.dc-live i,.dc-links line,.dc-flow-line i{animation:none!important}
   .dc-doc,.dc-hit{animation:none!important}
 }
+
+/* ---------- empty-space fixes ---------- */
+.dc-inline-empty{min-height:0;padding:22px 14px;gap:6px}
+.dc-inline-empty.compact{padding:14px}
+.dc-bars.is-empty .dc-bar-track i{background:rgba(255,255,255,.06)}
+.dc-bars-hint{margin:8px 0 0;font-size:10px;line-height:1.45;color:var(--d-dim)}
+.dc-query-hint{display:block;font-size:8.5px;font-weight:750;letter-spacing:.12em;text-transform:uppercase;color:var(--d-dim);margin-bottom:4px}
+.dc-query-suggest{width:100%;background:none;border:0;border-bottom:1px solid var(--d-line-soft);font-family:inherit;color:inherit;text-align:left;cursor:pointer;padding:8px 0}
+.dc-query-suggest:last-child{border-bottom:0;padding-bottom:0}
+.dc-query-suggest:hover .dc-query-q{color:#FFC3A4}
+.dc-query-suggest b{font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--d-orange)}
