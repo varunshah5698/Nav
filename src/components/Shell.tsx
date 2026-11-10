@@ -8,15 +8,15 @@ import { LogoMark } from "./Logo";
 import { navIcons } from "./icons";
 
 const items=[
-  {to:"/app/dashboard",label:"Dashboard"},
-  {to:"/app/canvas",label:"Canvas"},
-  {to:"/app/analyst",label:"Analyst"},
-  {to:"/app/sources",label:"Sources"},
-  {to:"/app/agents",label:"Agents"},
-  {to:"/app/experiments",label:"Experiments"},
-  {to:"/app/memory",label:"Memory"},
-  {to:"/app/discovery",label:"Discovery"},
-  {to:"/app/collaboration",label:"Share"},
+  {to:"/app/dashboard",label:"Dashboard",icon:"dashboard"},
+  {to:"/app/canvas",label:"Canvas",icon:"canvas"},
+  {to:"/app/analyst",label:"Analyst",icon:"analyst"},
+  {to:"/app/sources",label:"Sources",icon:"sources"},
+  {to:"/app/agents",label:"Agents",icon:"agents"},
+  {to:"/app/experiments",label:"Experiments",icon:"experiments"},
+  {to:"/app/memory",label:"Memory",icon:"memory"},
+  {to:"/app/discovery",label:"Discovery",icon:"discovery"},
+  {to:"/app/collaboration",label:"Share",icon:"share"},
 ];
 
 export default function Shell({children}:{children:React.ReactNode}){
@@ -56,7 +56,8 @@ export default function Shell({children}:{children:React.ReactNode}){
       </Link>
       <nav className="rg-nav" aria-label="Primary">
         {items.map(i=><NavLink key={i.to} to={i.to+(i.to==="/app/canvas"&&ws?`?ws=${ws.id}`:"")} className={({isActive})=>isActive?"active":""}>
-          {i.label}
+          <span className="rg-nav-ic" aria-hidden>{navIcons[i.icon]}</span>
+          <span className="rg-nav-label">{i.label}</span>
           {i.label==="Agents"&&pending>0&&<span className="rg-count">{pending}</span>}
         </NavLink>)}
       </nav>
@@ -108,7 +109,9 @@ export default function Shell({children}:{children:React.ReactNode}){
       </header>
       {open&&<nav className="rg-mobile-nav" id="rg-mobile-nav" aria-label="Primary mobile">
         {items.map(i=><NavLink key={i.to} to={i.to+(i.to==="/app/canvas"&&ws?`?ws=${ws.id}`:"")} className={({isActive})=>isActive?"active":""} onClick={()=>setOpen(false)}>
-          {i.label}{i.label==="Agents"&&pending>0&&<span className="rg-count">{pending}</span>}
+          <span className="rg-nav-ic" aria-hidden>{navIcons[i.icon]}</span>
+          <span className="rg-nav-label">{i.label}</span>
+          {i.label==="Agents"&&pending>0&&<span className="rg-count">{pending}</span>}
         </NavLink>)}
         <div className="rg-mobile-foot">
           <select className="rg-ws" value={ws?.id||""} onChange={e=>sw(e.target.value)} aria-label="Workspace">
