@@ -15,7 +15,7 @@ const files = readdirSync(join(root, "src/styles"))
 const baselinePath = join(root, "scripts/theme-light-baseline.json");
 const write = process.argv.includes("--write-baseline");
 
-const ACCENT = /(?:^|[.\s:])(?:btn-lime|badge\.lime|chip\.active|lime|db-delta|db-prop-ic|src-kind|mm-kind|mm-chip\.on|dc-type\.on|sx-chip\.on|sx-roleseg\s+button\.on|hza-pick\.on|hza-mini:hover|ag-pick\.on|highlight|toggle|switch)/i;
+const ACCENT = /(?:^|[.\s:])(?:btn-lime|badge\.lime|chip\.active|lime|db-delta|db-prop-ic|src-kind|mm-kind|mm-chip\.on|dc-type\.on|sx-chip\.on|sx-roleseg\s+button\.on|hza-pick\.on|hza-mini:hover|ag-pick\.on|analysis-orb|highlight|toggle|switch)/i;
 
 function luminance(r, g, b) {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
