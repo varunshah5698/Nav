@@ -33,6 +33,8 @@ Static build, published at <https://site-942642bb18134977bde5709248101d00.freebu
 
 The API allows browser origins listed in `CORS_ORIGINS` (comma-separated, defaults to `localhost:5173`), so local `npm run dev` keeps working against it.
 
+If the frontend is created as a **Web Service** instead of a Static Site (Render's Node runtime, build `npm install && npm run build`), the repo ships `server.mjs` plus a `start` script, so `npm start` serves `dist/` on `$PORT` with SPA fallback and gzip. A Web Service has no free CDN and sleeps when idle, so the Static Site remains the better choice; either way the build needs `VITE_API_URL` pointing at the API's public URL.
+
 ## Production path
 `backend/app/main.py` + `docker-compose.yml` (FastAPI, Postgres, Neo4j, Qdrant, worker, MinIO). Swap `src/lib/store.ts` persistence to API client; keys stay server-side (`OPENAI_API_KEY`/`GEMINI_API_KEY` never in bundle). PyMuPDF, Sentence-Transformers, LangGraph, Docker runners live in backend.
 
