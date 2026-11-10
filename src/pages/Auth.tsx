@@ -1,10 +1,11 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { LogoMark } from "../components/Logo";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { useStore } from "../lib/store";
+import { useAuthActions } from "@convex-dev/auth/react";
+import { useConvexAuth } from "@convex-dev/auth/react";
 import "../styles/auth.css";
 
 const Universe = lazy(() => import("../components/AuthScene"));
@@ -24,32 +25,6 @@ function StaticOrb() {
 }
 
 /* ---------- icons ---------- */
-const MailIcon = () => (
-  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <rect x="2.5" y="4.5" width="19" height="15" rx="3" />
-    <path d="m3 7 9 6 9-6" />
-  </svg>
-);
-const LockIcon = () => (
-  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <rect x="4" y="10" width="16" height="11" rx="3" />
-    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-    <circle cx="12" cy="15.5" r="1.2" />
-  </svg>
-);
-const UserIcon = () => (
-  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="12" cy="8" r="3.6" />
-    <path d="M4.5 20a7.5 7.5 0 0 1 15 0" />
-  </svg>
-);
-const EyeIcon = ({ off }: { off: boolean }) => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" />
-    <circle cx="12" cy="12" r="2.8" />
-    {off && <path d="M4 20 20 4" />}
-  </svg>
-);
 const ArrowIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M5 12h13M13 6l6 6-6 6" />
@@ -80,6 +55,23 @@ const GraphIcon = () => (
     <path d="m6.8 7.6 9.4 1M7.6 16.5 17.3 11" strokeLinecap="round" />
   </svg>
 );
+const GoogleMark = () => (
+  <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+  </svg>
+);
+
+function ShiftIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1" />
+      <path d="M20.5 4.5V10h-5.5" />
+    </svg>
+  );
+}
 
 /* ---------- shell ---------- */
 type Mode = "login" | "register";
@@ -142,21 +134,12 @@ function Frame({ mode, title, sub, children }: { mode: Mode; title: string; sub:
               {children}
             </div>
             <p className="auth-legal">
-              Prototype build · credentials stay in this browser (PBKDF2-hashed)
+              Sessions secured by Convex Auth · Google OAuth 2.0
             </p>
           </motion.section>
         </div>
       </div>
     </div>
-  );
-}
-
-function ShiftIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1" />
-      <path d="M20.5 4.5V10h-5.5" />
-    </svg>
   );
 }
 
@@ -174,202 +157,86 @@ function Alert({ children }: { children: ReactNode }) {
   );
 }
 
-/* ---------- login ---------- */
-export function Login() {
-  const login = useStore((s) => s.login);
+/* ---------- google auth ---------- */
+function useRedirectIfSignedIn() {
   const nav = useNavigate();
-  const [email, setEmail] = useState("");
-  const [pass, setPass] = useState("");
-  const [show, setShow] = useState(false);
-  const [remember, setRemember] = useState(true);
+  const { isLoading, isAuthenticated } = useConvexAuth();
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) nav("/app/dashboard", { replace: true });
+  }, [isLoading, isAuthenticated, nav]);
+}
+
+function GoogleForm({ cta, foot }: { cta: string; foot: ReactNode }) {
+  const { signIn } = useAuthActions();
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function go() {
     if (busy) return;
     setErr("");
     setBusy(true);
     try {
-      const msg = await login(email, pass);
-      if (msg) setErr(msg);
-      else nav("/app/dashboard");
-    } finally {
+      await signIn("google", { redirectTo: "/app/dashboard" });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Google sign-in failed. Please try again.");
       setBusy(false);
     }
   }
 
+  return (
+    <>
+      {err && <Alert>{err}</Alert>}
+      <button className="auth-google" type="button" onClick={go} disabled={busy}>
+        {busy ? <span className="auth-spin auth-spin-dark" aria-hidden="true" /> : <GoogleMark />}
+        <span>{busy ? "Opening Google…" : cta}</span>
+        {!busy && <ArrowIcon />}
+      </button>
+
+      <ul className="auth-assure">
+        <li>Verified by Google — ResearchGraph never sees your password.</li>
+        <li>Your workspace is private to your Google account.</li>
+        <li>Sessions refresh automatically; sign out from the account menu.</li>
+      </ul>
+
+      <p className="auth-foot">
+        Only your name, email and profile photo are stored. Your workspace, graph and sources are saved to
+        Convex and restored every time you sign in with this Google account.
+      </p>
+      <p className="auth-foot">{foot}</p>
+    </>
+  );
+}
+
+/* ---------- login ---------- */
+export function Login() {
+  useRedirectIfSignedIn();
   return (
     <Frame
       mode="login"
       title="Welcome back"
       sub={<>Sign in to open <b>your research workspace</b>.</>}
     >
-      <form onSubmit={submit} noValidate>
-        {err && <Alert>{err}</Alert>}
-
-        <label className="auth-label" htmlFor="auth-email">Email</label>
-        <div className="auth-field">
-          <span className="fi"><MailIcon /></span>
-          <input
-            id="auth-email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            placeholder="you@lab.edu"
-            autoFocus
-          />
-        </div>
-
-        <div className="auth-gap" />
-
-        <label className="auth-label" htmlFor="auth-pass">Password</label>
-        <div className="auth-field">
-          <span className="fi"><LockIcon /></span>
-          <input
-            id="auth-pass"
-            type={show ? "text" : "password"}
-            value={pass}
-            onChange={(e) => setPass(e.target.value)}
-            autoComplete="current-password"
-            placeholder="••••••••"
-          />
-          <button
-            type="button"
-            className="auth-eye"
-            onClick={() => setShow(!show)}
-            aria-label={show ? "Hide password" : "Show password"}
-            aria-pressed={show}
-          >
-            <EyeIcon off={show} />
-          </button>
-        </div>
-
-        <div className="auth-row">
-          <label className="auth-check">
-            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-            Remember me
-          </label>
-          <span className="auth-hint">Reset via owner (prototype)</span>
-        </div>
-
-        <button className="auth-submit" type="submit" disabled={busy}>
-          {busy ? <><span className="auth-spin" /> Signing in</> : <>Enter workspace <ArrowIcon /></>}
-        </button>
-
-        <div className="auth-div">or</div>
-
-        <Link className="auth-alt" to="/register">
-          <SparkIcon /> Create a free workspace
-        </Link>
-
-        <p className="auth-foot">
-          Registering seeds a labelled demo graph so you can explore immediately.
-        </p>
-      </form>
+      <GoogleForm
+        cta="Sign in with Google"
+        foot={<>New here? <Link to="/register">Create an account</Link></>}
+      />
     </Frame>
   );
 }
 
 /* ---------- register ---------- */
 export function Register() {
-  const reg = useStore((s) => s.register);
-  const nav = useNavigate();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [p1, setP1] = useState("");
-  const [p2, setP2] = useState("");
-  const [show, setShow] = useState(false);
-  const [terms, setTerms] = useState(false);
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (busy) return;
-    setErr("");
-    if (!terms) return setErr("Please accept the research-use terms.");
-    if (p1 !== p2) return setErr("Passwords do not match.");
-    setBusy(true);
-    try {
-      const msg = await reg(name, email, p1);
-      if (msg) setErr(msg);
-      else nav("/app/dashboard");
-    } finally {
-      setBusy(false);
-    }
-  }
-
+  useRedirectIfSignedIn();
   return (
     <Frame
       mode="register"
-      title="Create your workspace"
-      sub={<>Isolated per user · <b>PBKDF2-hashed</b> credentials.</>}
+      title="Create your account"
+      sub={<>First time? <b>Sign up with Google</b> — no new password to remember.</>}
     >
-      <form onSubmit={submit} noValidate>
-        {err && <Alert>{err}</Alert>}
-
-        <label className="auth-label" htmlFor="auth-name">Full name</label>
-        <div className="auth-field">
-          <span className="fi"><UserIcon /></span>
-          <input id="auth-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Ada Lovelace" autoFocus />
-        </div>
-
-        <div className="auth-gap" />
-
-        <label className="auth-label" htmlFor="auth-reg-email">Email</label>
-        <div className="auth-field">
-          <span className="fi"><MailIcon /></span>
-          <input id="auth-reg-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@lab.edu" />
-        </div>
-
-        <div className="auth-gap" />
-
-        <label className="auth-label" htmlFor="auth-p1">Password <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>(8+ chars)</span></label>
-        <div className="auth-field">
-          <span className="fi"><LockIcon /></span>
-          <input id="auth-p1" type={show ? "text" : "password"} value={p1} onChange={(e) => setP1(e.target.value)} autoComplete="new-password" placeholder="Create a password" />
-          <button
-            type="button"
-            className="auth-eye"
-            onClick={() => setShow(!show)}
-            aria-label={show ? "Hide password" : "Show password"}
-            aria-pressed={show}
-          >
-            <EyeIcon off={show} />
-          </button>
-        </div>
-
-        <div className="auth-gap" />
-
-        <label className="auth-label" htmlFor="auth-p2">Confirm password</label>
-        <div className="auth-field">
-          <span className="fi"><LockIcon /></span>
-          <input id="auth-p2" type={show ? "text" : "password"} value={p2} onChange={(e) => setP2(e.target.value)} autoComplete="new-password" placeholder="Repeat password" />
-        </div>
-
-        <div className="auth-row">
-          <label className="auth-check">
-            <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
-            I accept the research-use terms
-          </label>
-        </div>
-
-        <button className="auth-submit" type="submit" disabled={busy}>
-          {busy ? <><span className="auth-spin" /> Creating</> : <>Create workspace <ArrowIcon /></>}
-        </button>
-
-        <div className="auth-div">or</div>
-
-        <Link className="auth-alt" to="/login">
-          <LockIcon /> Sign in to an existing workspace
-        </Link>
-
-        <p className="auth-foot">
-          Demo records are labelled and never presented as real results.
-        </p>
-      </form>
+      <GoogleForm
+        cta="Sign up with Google"
+        foot={<>Already have an account? <Link to="/login">Sign in</Link></>}
+      />
     </Frame>
   );
 }

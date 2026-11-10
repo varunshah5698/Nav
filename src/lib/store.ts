@@ -2,23 +2,23 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Activity, AgentName, AgentRun, Edge, Experiment, Invite, MemoryEntry, RNode, SearchLog, Source, User, Workspace, Membership, ExportJob } from "./types";
 import { seedDemo } from "./seed";
-import { hashPassword, verifyPassword, validEmail, rateLimited } from "./auth";
 import { chunkPages, leadOf, digestSource } from "./text";
 
 const uid=(p:string)=>p+"-"+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4);
 const now=()=>new Date().toISOString();
 
 interface State {
-  users:User[]; sessionUserId:string|null;
+  users:User[]; sessionUserId:string|null; cloudReady:boolean;
   workspaces:Workspace[]; memberships:Membership[]; activeWs:string|null;
   nodes:RNode[]; edges:Edge[]; sources:Source[]; agents:AgentRun[];
   experiments:Experiment[]; memories:MemoryEntry[]; activities:Activity[];
   invites:Invite[]; exports:ExportJob[]; searchLogs:SearchLog[];
   toasts:string[];
-  // auth
-  register:(name:string,email:string,pass:string)=>Promise<string|null>;
-  login:(email:string,pass:string)=>Promise<string|null>;
-  logout:()=>void;
+  // session (identity itself comes from Convex Auth, never from local storage)
+  startSession:(u:User)=>void;
+  clearSession:()=>void;
+  seedFor:(userId:string)=>void;
+  loadSnapshot:(payload:string)=>void;
   // ws
   createWorkspace:(name:string,desc:string)=>void; switchWs:(id:string)=>void;
   canEdit:()=>boolean; isOwner:()=>boolean;
@@ -47,50 +47,55 @@ interface State {
   invite:(email:string,role:Membership["role"])=>void; acceptInvite:(id:string)=>void; setRole:(ws:string,user:string,role:Membership["role"])=>void;
   addExport:(kind:string,format:string)=>void;
   logSearch:(ws:string,query:string,results:number,ms:number)=>void; markOpened:(ws:string)=>void;
-  seedIfEmpty:()=>void;
 }
 function demoFor(userId:string){
   const s=seedDemo(userId);
   return s;
 }
 export const useStore = create<State>()(persist((set,get)=>({
-  users:[], sessionUserId:null, workspaces:[], memberships:[], activeWs:null,
+  users:[], sessionUserId:null, cloudReady:false, workspaces:[], memberships:[], activeWs:null,
   nodes:[], edges:[], sources:[], agents:[], experiments:[], memories:[], activities:[],
   invites:[], exports:[], searchLogs:[], toasts:[],
   toast:(m)=>{ set(s=>({toasts:[...s.toasts,m]})); setTimeout(()=>set(s=>({toasts:s.toasts.slice(1)})),3200); },
   log:(ws,kind,text,refType,refId)=>set(s=>({activities:[{id:uid("ac"),workspaceId:ws,kind,text,refType,refId,createdAt:now()},...s.activities].slice(0,400)})),
-  seedIfEmpty:()=>{ /* seeded on register */ },
 
-  register:async(name,email,pass)=>{
-    email=email.trim().toLowerCase();
-    if(!name.trim()) return "Enter your name.";
-    if(!validEmail(email)) return "Enter a valid email.";
-    if(pass.length<8) return "Password must be 8+ characters.";
-    if(rateLimited("reg:"+email)) return "Too many attempts. Try later.";
-    if(get().users.some(u=>u.email===email)) return "That email is already registered.";
-    const {hash,salt}=await hashPassword(pass);
-    const u:User={id:uid("u"),name:name.trim(),email,passHash:hash,salt,createdAt:now()};
-    const s=demoFor(u.id);
-    set(st=>({ users:[...st.users,u], sessionUserId:u.id,
-      workspaces:[...st.workspaces,s.ws], memberships:[...st.memberships,{workspaceId:s.ws.id,userId:u.id,role:"owner"}],
-      activeWs:s.ws.id, nodes:[...st.nodes,...s.nodes], edges:[...st.edges,...s.edges],
-      sources:[...st.sources,...s.sources], experiments:[...st.experiments,...s.experiments],
-      memories:[...st.memories,...s.memories], agents:[...st.agents,...s.agents], activities:[...s.acts,...st.activities] }));
-    get().toast("Welcome — demo workspace seeded (labelled Demo).");
-    return null;
+  startSession:(u)=>set({
+    users:[u], sessionUserId:u.id, cloudReady:false,
+    workspaces:[], memberships:[], activeWs:null,
+    nodes:[], edges:[], sources:[], agents:[], experiments:[], memories:[], activities:[],
+    invites:[], exports:[], searchLogs:[],
+  }),
+  clearSession:()=>set({
+    users:[], sessionUserId:null, cloudReady:false,
+    workspaces:[], memberships:[], activeWs:null,
+    nodes:[], edges:[], sources:[], agents:[], experiments:[], memories:[], activities:[],
+    invites:[], exports:[], searchLogs:[],
+  }),
+  seedFor:(userId)=>{
+    if(get().workspaces.length){ set({cloudReady:true}); return; }
+    const s=demoFor(userId);
+    set({
+      workspaces:[s.ws], memberships:[{workspaceId:s.ws.id,userId,role:"owner"}], activeWs:s.ws.id,
+      nodes:s.nodes, edges:s.edges, sources:s.sources, experiments:s.experiments,
+      memories:s.memories, agents:s.agents, activities:s.acts, cloudReady:true,
+    });
   },
-  login:async(email,pass)=>{
-    email=email.trim().toLowerCase();
-    if(rateLimited("login:"+email)) return "Too many attempts. Wait 10 minutes.";
-    const u=get().users.find(x=>x.email===email);
-    if(!u) return "No account for that email.";
-    if(!(await verifyPassword(pass,u.salt,u.passHash))) return "Incorrect password.";
-    const myWs=get().workspaces.find(w=>w.ownerId===u.id)||get().workspaces[0];
-    set({sessionUserId:u.id, activeWs:myWs?.id||null});
-    get().toast("Welcome back, "+u.name.split(" ")[0]+".");
-    return null;
+  loadSnapshot:(payload)=>{
+    try{
+      const d=JSON.parse(payload) as Partial<State>;
+      set({
+        workspaces:d.workspaces??[], memberships:d.memberships??[],
+        activeWs:d.activeWs??d.workspaces?.[0]?.id??null,
+        nodes:d.nodes??[], edges:d.edges??[], sources:d.sources??[], agents:d.agents??[],
+        experiments:d.experiments??[], memories:d.memories??[], activities:d.activities??[],
+        invites:d.invites??[], exports:d.exports??[], searchLogs:d.searchLogs??[],
+        cloudReady:true,
+      });
+    }catch{
+      set({cloudReady:true});
+      get().toast("Cloud snapshot could not be read — starting empty.");
+    }
   },
-  logout:()=>set({sessionUserId:null}),
   createWorkspace:(name,desc)=>{
     const u=get().sessionUserId; if(!u) return;
     const ws:Workspace={id:uid("ws"),name:name.trim()||"Untitled workspace",description:desc,ownerId:u,createdAt:now()};
@@ -260,7 +265,10 @@ export const useStore = create<State>()(persist((set,get)=>({
   addExport:(kind,format)=>{ const ws=get().activeWs!; set(s=>({exports:[{id:uid("xp"),workspaceId:ws,kind,format,createdAt:now(),status:"completed",size:"~"+(4+Math.floor(Math.random()*40))+" KB"},...s.exports]})); get().log(ws,"export",`Export generated: ${kind}.${format}`); },
   logSearch:(ws,query,results,ms)=>set(s=>({searchLogs:[{id:uid("q"),workspaceId:ws,query,results,opened:false,createdAt:now(),durationMs:Math.round(ms)},...s.searchLogs].slice(0,200)})),
   markOpened:(_ws)=>set(s=>({searchLogs:s.searchLogs.map((l,i)=>i===0?{...l,opened:true}:l)})),
-}),{name:"rg.v1",partialize:(s)=>{const {toasts,...rest}=s; return rest;}}));
+}),{name:"rg.v1",version:1,
+  // v0 persisted local accounts and password hashes — drop them on upgrade.
+  migrate:(p)=>{ if(!p||typeof p!=="object") return p as State; const {users:_u,sessionUserId:_s,...rest}=p as Record<string,unknown>; return rest as unknown as State; },
+  partialize:(s)=>{const {toasts:_t,users:_u,sessionUserId:_sid,cloudReady:_c,...rest}=s; return rest;}}));
 export function label(a:AgentName){ return {controller:"Controller",paper_reader:"Paper Reader",equation:"Equation Extractor",code_setup:"Code Setup",experiment:"Experiment Agent",benchmark:"Benchmark",memory:"Memory Agent",review:"Review Agent"}[a]; }
 function digestMode(agent:AgentName):"summary"|"equations"|"review"|null{
   return agent==="paper_reader"?"summary":agent==="equation"?"equations":agent==="review"?"review":null;
