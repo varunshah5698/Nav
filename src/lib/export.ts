@@ -198,5 +198,15 @@ export function workspaceReport(
     out.push(``);
   }
 
+  if (on.has("files")) {
+    out.push(`## Handoff files`);
+    out.push(
+      files.length
+        ? files.map((f) => `- ${f.name} _(${f.ext.toUpperCase()}, ${prettySize(f.bytes)})_`).join("\n")
+        : "_No files attached._",
+    );
+    out.push(``);
+  }
+
   return out.join("\n");
 }
