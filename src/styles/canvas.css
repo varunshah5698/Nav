@@ -207,7 +207,10 @@
 
 /* ---------- flow area ---------- */
 .cv-flow{position:relative;flex:1;min-height:0;background:
-  radial-gradient(120% 95% at 50% -10%,#2A2825 0%,#1F1E1C 72%)}
+  linear-gradient(rgba(255,255,255,.038) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(255,255,255,.038) 1px,transparent 1px),
+  radial-gradient(120% 95% at 50% -10%,#2A2825 0%,#1F1E1C 72%);
+  background-size:52px 52px,52px 52px,auto}
 .cv-flow .react-flow{background:transparent}
 .react-flow__pane{cursor:default}
 .react-flow__node{font-family:var(--font);transition:opacity .26s ease,filter .26s ease}

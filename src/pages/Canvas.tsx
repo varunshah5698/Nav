@@ -421,7 +421,7 @@ export default function Canvas() {
             connectionLineStyle={{ stroke: ACCENT, strokeWidth: 1.6, strokeDasharray: "5 4" }}
             proOptions={{ hideAttribution: false }}
           >
-            <Background variant={BackgroundVariant.Dots} gap={26} size={1} color="rgba(255,255,255,.13)" />
+            <Background variant={BackgroundVariant.Dots} gap={26} size={1} color="rgba(255,255,255,.18)" />
             <Controls showInteractive={false} position="bottom-left" />
             <MiniMap pannable zoomable position="bottom-right"
               nodeColor={(n: any) => C[(n.data?.node?.type as NodeType) || "note"]}
@@ -533,7 +533,7 @@ export default function Canvas() {
           </div>
           {byType.length ? (
             <div className="cv-mix">
-              {byType.slice(0, 6).map(t => (
+              {byType.map(t => (
                 <button key={t.type} className="cv-mix-row"
                   onClick={() => { setFilter(filter === t.type ? "all" : t.type); setQ(""); }}
                   aria-pressed={filter === t.type} title={`Show only ${pretty(t.type)}`}>
@@ -542,7 +542,6 @@ export default function Canvas() {
                   <b>{t.n}</b>
                 </button>
               ))}
-              {byType.length > 6 && <p className="cv-mix-more">+{byType.length - 6} smaller types</p>}
             </div>
           ) : <p className="cv-ok">No nodes yet — add your first one.</p>}
         </section>
@@ -553,16 +552,19 @@ export default function Canvas() {
             <span className={`cv-stat-pill${gm.isolated.length ? " warn" : ""}`}>{gm.isolated.length}</span>
           </div>
           {gm.isolated.length ? (
-            <div className="cv-orphans">
-              {gm.isolated.slice(0, 4).map(n => (
-                <button key={n.id} onClick={() => { setSel(n.id); setSelEdge(null); bringIntoView(n.id); }}>
-                  <i style={{ background: C[n.type] }} />
-                  <span>{n.title}</span>
-                  <em>{pretty(n.type)}</em>
-                </button>
-              ))}
-              {gm.isolated.length > 4 && <p className="cv-mix-more">+{gm.isolated.length - 4} more on the stage</p>}
-            </div>
+            <>
+              <div className="cv-orphans">
+                {gm.isolated.slice(0, 4).map(n => (
+                  <button key={n.id} onClick={() => { setSel(n.id); setSelEdge(null); bringIntoView(n.id); }}>
+                    <i style={{ background: C[n.type] }} />
+                    <span>{n.title}</span>
+                    <em>{pretty(n.type)}</em>
+                  </button>
+                ))}
+                {gm.isolated.length > 4 && <p className="cv-mix-more">+{gm.isolated.length - 4} more on the stage</p>}
+              </div>
+              <p className="cv-panel-note">Isolated nodes need at least one link — drag from a side dot to connect them.</p>
+            </>
           ) : <p className="cv-ok">✓ Every node has at least one link.</p>}
         </section>
       </aside>
@@ -593,11 +595,14 @@ export default function Canvas() {
             <Link className="cv-linkpill" to="/app/collaboration">History</Link>
           </div>
           {acts.length ? (
-            <ol className="cv-tl">
-              {acts.map((a: Activity) => (
-                <li key={a.id}><span className={`dot ${a.kind}`} /><div><p>{a.text}</p><time>{rel(a.createdAt)}</time></div></li>
-              ))}
-            </ol>
+            <>
+              <ol className="cv-tl">
+                {acts.map((a: Activity) => (
+                  <li key={a.id}><span className={`dot ${a.kind}`} /><div><p>{a.text}</p><time>{rel(a.createdAt)}</time></div></li>
+                ))}
+              </ol>
+              <p className="cv-panel-note">Activity is logged automatically as you work.</p>
+            </>
           ) : <p className="cv-ok">Activity appears as you add sources, run agents and link nodes.</p>}
         </section>
       </section>
