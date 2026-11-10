@@ -14,12 +14,13 @@ import NodeAnalysis from "../components/NodeAnalysis";
 import { graphMetrics } from "../lib/analytics";
 import type { EdgeType, NodeType, RNode, Activity } from "../lib/types";
 
-/* ---------- type system ---------- */
+/* ---------- type system (warm, readable on white) ---------- */
 const C: Record<NodeType, string> = {
-  paper: "#B7A8FF", dataset: "#7FB0FF", code_repo: "#8FA6A6", code_file: "#78898A",
-  note: "#D8F85E", webpage: "#9FC4FF", question: "#F0CE4E", experiment: "#D8F85E",
-  result: "#5BE39A", error: "#FF7A7A", fix: "#5BE39A", conclusion: "#CBB6FF",
+  paper: "#6B4BCE", dataset: "#245CB3", code_repo: "#446161", code_file: "#536A6A",
+  note: "#946700", webpage: "#2F5FB0", question: "#9C6A00", experiment: "#55700A",
+  result: "#157A4A", error: "#B52F2F", fix: "#157A4A", conclusion: "#6240B8",
 };
+const ACCENT = "#E8532A";
 const NODE_TYPES: NodeType[] = ["paper", "dataset", "code_repo", "code_file", "note", "webpage", "question", "experiment", "result", "error", "fix", "conclusion"];
 const LABEL: Record<EdgeType, string> = {
   supports: "supports", references: "references", uses: "uses", investigates: "investigates",
@@ -155,8 +156,8 @@ export default function Canvas() {
           id: e.id, source: e.source, target: e.target,
           className: dim ? "cv-dim" : "",
           animated: e.type === "produces",
-          style: { stroke: on ? "rgba(216,248,94,.8)" : "rgba(255,255,255,.22)", strokeWidth: on ? 1.9 : 1.3 },
-          markerEnd: { type: MarkerType.ArrowClosed, width: 13, height: 13, color: on ? "rgba(216,248,94,.8)" : "rgba(255,255,255,.3)" },
+          style: { stroke: on ? "rgba(232,83,42,.82)" : "rgba(74,61,50,.30)", strokeWidth: on ? 1.9 : 1.3 },
+          markerEnd: { type: MarkerType.ArrowClosed, width: 13, height: 13, color: on ? "rgba(232,83,42,.82)" : "rgba(74,61,50,.34)" },
         } as RFEdge;
       }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -350,7 +351,7 @@ export default function Canvas() {
 
           <div className="cv-types" ref={typeRef}>
             <button className={`cv-chip${filter !== "all" ? " on" : ""}`} onClick={() => setTypeOpen(o => !o)} aria-expanded={typeOpen}>
-              <i style={{ background: filter === "all" ? "#D8F85E" : C[filter] }} />
+              <i style={{ background: filter === "all" ? ACCENT : C[filter] }} />
               {filter === "all" ? "All types" : pretty(filter)}
               <span className="cv-chip-n">{filter === "all" ? nodes.length : counts[filter] || 0}</span>
               <span className="cv-caret" aria-hidden>▾</span>
@@ -358,7 +359,7 @@ export default function Canvas() {
             {typeOpen && (
               <div className="cv-pop" role="listbox">
                 <button className={filter === "all" ? "on" : ""} onClick={() => { setFilter("all"); setTypeOpen(false); }}>
-                  <i style={{ background: "#D8F85E" }} /> All types <span>{nodes.length}</span>
+                  <i style={{ background: ACCENT }} /> All types <span>{nodes.length}</span>
                 </button>
                 {NODE_TYPES.filter(t => counts[t]).map(t => (
                   <button key={t} className={filter === t ? "on" : ""} onClick={() => { setFilter(t); setTypeOpen(false); }}>
@@ -394,14 +395,14 @@ export default function Canvas() {
             onPaneClick={() => { setSel(null); setSelEdge(null); }}
             nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.14, maxZoom: 1 }}
             minZoom={0.25} maxZoom={1.8} nodesConnectable={canEdit} nodesDraggable={canEdit}
-            connectionLineStyle={{ stroke: "#D8F85E", strokeWidth: 1.6, strokeDasharray: "5 4" }}
+            connectionLineStyle={{ stroke: ACCENT, strokeWidth: 1.6, strokeDasharray: "5 4" }}
             proOptions={{ hideAttribution: false }}
           >
-            <Background variant={BackgroundVariant.Dots} gap={26} size={1} color="rgba(255,255,255,.13)" />
+            <Background variant={BackgroundVariant.Dots} gap={26} size={1} color="rgba(120,98,80,.20)" />
             <Controls showInteractive={false} position="bottom-left" />
             <MiniMap pannable zoomable position="bottom-right"
               nodeColor={(n: any) => C[(n.data?.node?.type as NodeType) || "note"]}
-              nodeStrokeWidth={0} maskColor="rgba(11,14,14,.72)"
+              nodeStrokeWidth={0} maskColor="rgba(247,242,236,.72)"
               style={{ width: 132, height: 88 }} />
           </ReactFlow>
 
@@ -467,7 +468,7 @@ export default function Canvas() {
             {edge && (
               <>
                 <div className="cv-insp-h">
-                  <span className="cv-tag" style={{ color: "#CBD5D5" }}><i style={{ background: "#D8F85E" }} />connection</span>
+                  <span className="cv-tag" style={{ color: "#6E6055" }}><i style={{ background: ACCENT }} />connection</span>
                   <button className="cv-x" onClick={() => setSelEdge(null)} aria-label="Close inspector">✕</button>
                 </div>
                 <div className="cv-insp-body">
