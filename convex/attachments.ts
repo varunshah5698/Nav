@@ -25,8 +25,6 @@ const EXT_KIND = new Map<string, "pdf" | "doc" | "slides" | "text" | "sheet" | "
   ["zip", "archive"],
 ]);
 
-const extOf = (name: string) => name.split(".").pop()?.toLowerCase() || "";
-
 export const list = query({
   args: { workspaceId: v.string() },
   handler: async (ctx, { workspaceId }) => {

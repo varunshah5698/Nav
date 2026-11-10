@@ -1,8 +1,12 @@
 import { useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useAction, useMutation, useQuery } from "convex/react";
+import { zip } from "fflate";
 import { useStore } from "../lib/store";
 import { Badge } from "../components/ui";
 import { Donut } from "../components/Charts";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import type { Membership } from "../lib/types";
 import {
   bibtex,
@@ -100,31 +104,61 @@ const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 60 * 1024 * 1024;
 const FILE_ACCEPT = UPLOAD_FORMATS.flatMap((f) => f.exts.map((e) => `.${e}`)).join(",");
 
-interface ShareFile {
+interface PendingUpload {
   id: string;
   file: File;
   ext: string;
   kind: FileKind;
-  addedAt: number;
+  status: "uploading" | "failed";
+  error?: string;
+}
+interface SeenFile {
+  name: string;
+  size: number;
+  lastModified?: number;
 }
 interface RejectedFile {
   name: string;
   reason: string;
+}
+interface MailState {
+  tone: "ok" | "warn" | "err";
+  text: string;
+  mailto?: string;
 }
 
 const extOf = (name: string) => name.split(".").pop()?.toLowerCase() || "";
 const kindOf = (ext: string) => EXT_KIND.get(ext);
 const formatLabel = (kind: FileKind) => UPLOAD_FORMATS.find((f) => f.kind === kind)?.label || kind;
 
-function rejectReason(file: File, total: number, seen: ShareFile[]): string | null {
+function rejectReason(file: File, total: number, seen: SeenFile[]): string | null {
   const ext = extOf(file.name);
   if (!kindOf(ext)) return ext ? `Unsupported .${ext} files` : "File has no extension";
   if (!file.size) return "File is empty";
   if (file.size > MAX_FILE_BYTES) return `Larger than ${prettySize(MAX_FILE_BYTES)}`;
-  if (total + file.size > MAX_TOTAL_BYTES) return `Over the ${prettySize(MAX_TOTAL_BYTES)} session cap`;
-  if (seen.some((s) => s.file.name === file.name && s.file.size === file.size && s.file.lastModified === file.lastModified))
+  if (total + file.size > MAX_TOTAL_BYTES) return `Over the ${prettySize(MAX_TOTAL_BYTES)} workspace cap`;
+  if (seen.some((s) => s.name === file.name && s.size === file.size && (s.lastModified === undefined || s.lastModified === file.lastModified)))
     return "Already attached";
   return null;
+}
+
+function zipFiles(files: Record<string, Uint8Array>): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    zip(files, (error, data) => (error ? reject(error) : resolve(data)));
+  });
+}
+
+function safeZipName(name: string, used: Set<string>) {
+  const cleaned = name.replace(/[\\/:*?"<>|]+/g, "-").replace(/^\.+/, "").trim() || "file";
+  let candidate = cleaned;
+  let i = 2;
+  while (used.has(candidate.toLowerCase())) {
+    const dot = cleaned.lastIndexOf(".");
+    candidate = dot > 0 ? `${cleaned.slice(0, dot)} (${i})${cleaned.slice(dot)}` : `${cleaned} (${i})`;
+    i += 1;
+  }
+  used.add(candidate.toLowerCase());
+  return candidate;
 }
 
 function FileGlyph({ kind }: { kind: FileKind }) {
@@ -164,7 +198,7 @@ function FileGlyph({ kind }: { kind: FileKind }) {
   );
 }
 
-function Ico({ name }: { name: "share" | "upload" | "mail" | "link" | "download" | "trash" | "search" | "shield" | "users" | "export" }) {
+function Ico({ name }: { name: "share" | "upload" | "mail" | "link" | "download" | "trash" | "search" | "shield" | "users" | "export" | "retry" }) {
   const paths = {
     share: <><path d="M9 11.4V2.9M6.3 5.6 9 2.9l2.7 2.7" /><path d="M3.4 11v3.1a1 1 0 0 0 1 1h9.2a1 1 0 0 0 1-1V11" /></>,
     upload: <><path d="M9 12.4V3.4M5.9 6.5 9 3.4l3.1 3.1" /><path d="M3.3 11.5v3a1.4 1.4 0 0 0 1.4 1.4h8.6a1.4 1.4 0 0 0 1.4-1.4v-3" /></>,
@@ -176,6 +210,7 @@ function Ico({ name }: { name: "share" | "upload" | "mail" | "link" | "download"
     shield: <><path d="M9 2.6 14.4 4.8v4.5c0 3.1-2.2 5.3-5.4 6.3-3.2-1-5.4-3.2-5.4-6.3V4.8Z" /><path d="m6.5 8.7 1.7 1.7 3.3-3.4" /></>,
     users: <><circle cx="7" cy="6.2" r="2.5" /><path d="M2.6 14.7c0-2.4 2-3.9 4.4-3.9s4.4 1.5 4.4 3.9" /><path d="M11.9 4.1a2.4 2.4 0 0 1 0 4.4M12.8 10.9c1.7.4 2.7 1.7 2.7 3.5" /></>,
     export: <><path d="M9 2.8v8.4M5.9 8.1 9 11.2l3.1-3.1" /><path d="M3.2 12.1v2.2a1.4 1.4 0 0 0 1.4 1.4h8.8a1.4 1.4 0 0 0 1.4-1.4v-2.2" /></>,
+    retry: <><path d="M14.3 7.2A5.5 5.5 0 1 0 14.6 11" /><path d="M14.6 3.1v4.2h-4.2" /></>,
   };
   return (
     <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden focusable="false">
@@ -297,6 +332,17 @@ export default function Collaboration() {
   const addExport = useStore((s) => s.addExport);
   const canManage = useStore((s) => s.isOwner);
 
+  const generateUploadUrl = useMutation(api.attachments.generateUploadUrl);
+  const registerAttachment = useMutation(api.attachments.register);
+  const removeAttachment = useMutation(api.attachments.remove);
+  const clearAttachments = useMutation(api.attachments.clear);
+  const sendInviteEmail = useAction(api.inviteEmails.send);
+  const attachmentRows = useQuery(
+    api.attachments.list,
+    activeWs ? { workspaceId: activeWs } : "skip",
+  );
+  const attachments = useMemo(() => attachmentRows ?? [], [attachmentRows]);
+
   const owner = canManage();
   const myRole = members.find((m) => m.userId === sessionUserId)?.role;
   const me = users.find((u) => u.id === sessionUserId);
@@ -307,22 +353,31 @@ export default function Collaboration() {
   const [role, setRole_] = useState<"editor" | "viewer">("viewer");
   const [note, setNote] = useState("");
   const [copied, setCopied] = useState("");
-  const [uploads, setUploads] = useState<ShareFile[]>([]);
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
   const [rejects, setRejects] = useState<RejectedFile[]>([]);
-  const [dragging, setDragging] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [fileQuery, setFileQuery] = useState("");
+  const [mailState, setMailState] = useState<MailState | null>(null);
+  const [sendingInvite, setSendingInvite] = useState(false);
+  const [bundling, setBundling] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const runCount = useMemo(() => exps.reduce((a, e) => a + e.runs.length, 0), [exps]);
   const pending = invites.filter((i) => i.status === "pending");
-  const totalUploadBytes = useMemo(() => uploads.reduce((a, f) => a + f.file.size, 0), [uploads]);
-  const shownFiles = useMemo(() => {
+  const totalUploadBytes = useMemo(() => attachments.reduce((a, f) => a + f.size, 0), [attachments]);
+  const pendingBytes = useMemo(() => pendingUploads.reduce((a, f) => a + f.file.size, 0), [pendingUploads]);
+  const shownAttachments = useMemo(() => {
     const q = fileQuery.trim().toLowerCase();
-    return q ? uploads.filter((f) => f.file.name.toLowerCase().includes(q)) : uploads;
-  }, [uploads, fileQuery]);
+    return q ? attachments.filter((f) => f.name.toLowerCase().includes(q)) : attachments;
+  }, [attachments, fileQuery]);
+  const shownPending = useMemo(() => {
+    const q = fileQuery.trim().toLowerCase();
+    return q ? pendingUploads.filter((f) => f.file.name.toLowerCase().includes(q)) : pendingUploads;
+  }, [pendingUploads, fileQuery]);
+  const filesLoading = attachmentRows === undefined;
   const reportFiles = useMemo(
-    () => uploads.map((f) => ({ name: f.file.name, ext: f.ext, bytes: f.file.size })),
-    [uploads],
+    () => attachments.map((f) => ({ name: f.name, ext: f.ext, bytes: f.size })),
+    [attachments],
   );
 
   const roleCount = (r: Membership["role"]) => members.filter((m) => m.role === r).length;
@@ -338,7 +393,7 @@ export default function Collaboration() {
     { name: "Relationships", value: edges.length, color: "#C0B4F0" },
     { name: "Runs", value: runCount, color: "#D8F85E" },
     { name: "Memory", value: mems.length, color: "#F2B64B" },
-    { name: "Files", value: uploads.length, color: "#F3703F" },
+    { name: "Files", value: attachments.length, color: "#F3703F" },
   ];
   const shareTotal = shareItems.reduce((a, b) => a + b.value, 0);
 
@@ -371,6 +426,57 @@ export default function Collaboration() {
     toast(`Exported ${name}`);
   };
 
+  const runBundle = async () => {
+    if (!attachments.length) {
+      toast("Attach at least one file to build a bundle.");
+      return;
+    }
+    setBundling(true);
+    const used = new Set<string>();
+    const files: Record<string, Uint8Array> = {};
+    const manifest = [
+      `# ${ws?.name || "Workspace"} — handoff bundle`,
+      ``,
+      `_Generated ${new Date().toLocaleString()}. The selected export is included at the root; attached files are under ` +
+        "`files/`._",
+      ``,
+      `## Export`,
+      `- ${filename}`,
+      ``,
+      `## Attached files`,
+    ];
+    let included = 0;
+    for (const file of attachments) {
+      try {
+        if (!file.url) throw new Error("No download URL");
+        const response = await fetch(file.url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        files[`files/${safeZipName(file.name, used)}`] = new Uint8Array(await response.arrayBuffer());
+        manifest.push(`- ${file.name} _(${file.ext.toUpperCase()}, ${prettySize(file.size)})_`);
+        included += 1;
+      } catch {
+        manifest.push(`- ${file.name} — could not be included in this bundle`);
+      }
+    }
+    files[filename] = new TextEncoder().encode(buildFor(format));
+    files["MANIFEST.md"] = new TextEncoder().encode(manifest.join("\n"));
+    try {
+      const zipped = await zipFiles(files);
+      const name = `${slug(ws?.name || "workspace")}-handoff.zip`;
+      downloadBlob(name, new Blob([zipped.buffer as ArrayBuffer], { type: "application/zip" }));
+      addExport("bundle", "zip");
+      toast(
+        included === attachments.length
+          ? `Bundle created — ${included} file${included === 1 ? "" : "s"} + ${meta.label}.`
+          : `Bundle created — ${included} of ${attachments.length} files included.`,
+      );
+    } catch {
+      toast("Could not build the ZIP bundle. Try again.");
+    } finally {
+      setBundling(false);
+    }
+  };
+
   const copy = async (text: string, key: string) => {
     const ok = await writeClipboard(text);
     if (!ok) {
@@ -394,28 +500,115 @@ export default function Collaboration() {
     setSections((cur) => (cur.includes(id) ? (cur.length > 1 ? cur.filter((x) => x !== id) : cur) : [...cur, id]));
   };
 
-  const submitInvite = (e: FormEvent) => {
+  const mailtoFor = (to: string) => {
+    const subject = `${me?.name || "A researcher"} invited you to ${ws?.name || "a workspace"} on ResearchGraph`;
+    return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(inviteNote)}`;
+  };
+
+  const submitInvite = async (e: FormEvent) => {
     e.preventDefault();
     if (!owner) {
       toast("Only the workspace owner can invite.");
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const to = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
       toast("Enter a valid email address.");
       return;
     }
-    invite(email.trim(), role);
-    toast(`Invitation recorded for ${email.trim()}`);
+    invite(to, role);
     setEmail("");
+    setSendingInvite(true);
+    setMailState(null);
+    try {
+      const result = await sendInviteEmail({
+        to,
+        workspaceName: ws?.name || "a workspace",
+        inviterName: me?.name || "A researcher",
+        role,
+        note: note.trim() || undefined,
+        link: `${origin}/login`,
+      });
+      if (result.sent) {
+        setMailState({ tone: "ok", text: `Invitation emailed to ${to}.` });
+        toast(`Invitation emailed to ${to}`);
+      } else if (!result.configured) {
+        setMailState({
+          tone: "warn",
+          text: "Invitation recorded, but email delivery is not configured on this deployment. Send it from your mail app or copy the invite.",
+          mailto: mailtoFor(to),
+        });
+        toast("Invite saved — use your mail app to deliver it.");
+      } else {
+        setMailState({
+          tone: "err",
+          text: result.error || "The email could not be sent. The invitation is still recorded — use your mail app.",
+          mailto: mailtoFor(to),
+        });
+        toast("Invite saved, but the email could not be sent.");
+      }
+    } catch {
+      setMailState({
+        tone: "err",
+        text: "The email could not be sent. The invitation is still recorded — use your mail app.",
+        mailto: mailtoFor(to),
+      });
+      toast("Invite saved, but the email could not be sent.");
+    } finally {
+      setSendingInvite(false);
+    }
   };
 
   const openPicker = () => fileInput.current?.click();
 
-  const addFiles = (list: FileList | null) => {
+  const uploadOne = async (file: File, pendingId: string) => {
+    if (!activeWs) return false;
+    const ext = extOf(file.name);
+    const kind = kindOf(ext);
+    if (!kind) return false;
+    try {
+      const uploadUrl = await generateUploadUrl();
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!response.ok) throw new Error("The upload was rejected.");
+      const data = (await response.json()) as { storageId?: string };
+      if (!data.storageId) throw new Error("The upload did not return a storage id.");
+      await registerAttachment({
+        workspaceId: activeWs,
+        storageId: data.storageId as Id<"_storage">,
+        name: file.name,
+        ext,
+        size: file.size,
+      });
+      setPendingUploads((cur) => cur.filter((p) => p.id !== pendingId));
+      return true;
+    } catch (error) {
+      const raw = error instanceof Error ? error.message : "";
+      const message = /20 MB|60 MB|Unsupported|verification|limit|authenticated/i.test(raw)
+        ? raw.split("\n")[0]
+        : "Upload failed — check your connection and retry.";
+      setPendingUploads((cur) =>
+        cur.map((p) => (p.id === pendingId ? { ...p, status: "failed", error: message } : p)),
+      );
+      return false;
+    }
+  };
+
+  const addFiles = async (list: FileList | null) => {
     if (!list?.length) return;
-    const seen = [...uploads];
-    let total = totalUploadBytes;
-    const ok: ShareFile[] = [];
+    if (!activeWs) {
+      toast("Switch to a workspace before attaching files.");
+      return;
+    }
+    const seen: SeenFile[] = [
+      ...attachments.map((f) => ({ name: f.name, size: f.size })),
+      ...pendingUploads.map((f) => ({ name: f.file.name, size: f.file.size })),
+    ];
+    let total = totalUploadBytes + pendingBytes;
+    const accepted: File[] = [];
     const bad: RejectedFile[] = [];
     for (const file of Array.from(list)) {
       const reason = rejectReason(file, total, seen);
@@ -423,38 +616,90 @@ export default function Collaboration() {
         bad.push({ name: file.name, reason });
         continue;
       }
+      accepted.push(file);
+      seen.push({ name: file.name, size: file.size, lastModified: file.lastModified });
+      total += file.size;
+    }
+    setRejects(bad);
+    if (!accepted.length) return;
+
+    const pending = accepted.map((file) => {
       const ext = extOf(file.name);
-      const item: ShareFile = {
+      return {
         id: crypto.randomUUID(),
         file,
         ext,
         kind: kindOf(ext)!,
-        addedAt: Date.now(),
+        status: "uploading" as const,
       };
-      ok.push(item);
-      seen.push(item);
-      total += file.size;
-    }
-    if (ok.length) {
-      setUploads((cur) => [...cur, ...ok]);
-      setFileQuery("");
-      toast(`${ok.length} file${ok.length === 1 ? "" : "s"} added — listed in the report, never uploaded.`);
-    }
-    setRejects(bad);
-  };
-
-  const removeFile = (id: string) => {
-    const hit = uploads.find((f) => f.id === id);
-    setUploads((cur) => cur.filter((f) => f.id !== id));
-    setRejects([]);
-    if (hit) toast(`Removed ${hit.file.name}`);
-  };
-
-  const clearFiles = () => {
-    setUploads([]);
+    });
+    setPendingUploads((cur) => [...cur, ...pending]);
     setFileQuery("");
+
+    const results = await Promise.all(pending.map((p) => uploadOne(p.file, p.id)));
+    const saved = results.filter(Boolean).length;
+    if (saved === pending.length) {
+      toast(`${saved} file${saved === 1 ? "" : "s"} saved to the workspace — listed in the report.`);
+    } else if (saved > 0) {
+      toast(`${saved} of ${pending.length} files uploaded. Failed uploads stay in the tray.`);
+    }
+  };
+
+  const retryUpload = (item: PendingUpload) => {
+    setPendingUploads((cur) =>
+      cur.map((p) => (p.id === item.id ? { ...p, status: "uploading", error: undefined } : p)),
+    );
+    void uploadOne(item.file, item.id).then((ok) => {
+      if (ok) toast(`Uploaded ${item.file.name}`);
+    });
+  };
+
+  const removePending = (id: string) => {
+    setPendingUploads((cur) => cur.filter((f) => f.id !== id));
     setRejects([]);
-    toast("Session tray cleared.");
+  };
+
+  const removeFile = async (id: Id<"attachments">, name: string) => {
+    if (!window.confirm(`Remove “${name}” from this workspace? This deletes the stored file.`)) return;
+    try {
+      await removeAttachment({ id });
+      toast(`Removed ${name}`);
+    } catch {
+      toast("Could not remove that file. Try again.");
+    }
+  };
+
+  const clearFiles = async () => {
+    if (!attachments.length && !pendingUploads.length) return;
+    if (!window.confirm("Remove every attached file from this workspace? This cannot be undone.")) return;
+    try {
+      if (activeWs && attachments.length) await clearAttachments({ workspaceId: activeWs });
+      setPendingUploads([]);
+      setFileQuery("");
+      setRejects([]);
+      toast("Attachments cleared from the workspace.");
+    } catch {
+      toast("Could not clear attachments. Try again.");
+    }
+  };
+
+  const saveAttachment = async (file: { name: string; url: string | null }) => {
+    if (!file.url) {
+      toast("This file has no download URL.");
+      return;
+    }
+    try {
+      const response = await fetch(file.url);
+      if (!response.ok) throw new Error("Download failed");
+      downloadBlob(file.name, await response.blob());
+    } catch {
+      const anchor = document.createElement("a");
+      anchor.href = file.url;
+      anchor.target = "_blank";
+      anchor.rel = "noreferrer";
+      anchor.click();
+      toast("Opened the file in a new tab.");
+    }
   };
 
   const dropKey = (e: KeyboardEvent<HTMLLabelElement>) => {
@@ -465,7 +710,9 @@ export default function Collaboration() {
   };
 
   const formatOf = (kind: string, fmt: string) =>
-    FORMATS.find((f) => f.kind === kind || f.ext.slice(1) === fmt) ?? FORMATS[0];
+    kind === "bundle" || fmt === "zip"
+      ? { ...FORMATS[0], icon: "▣" }
+      : FORMATS.find((f) => f.kind === kind || f.ext.slice(1) === fmt) ?? FORMATS[0];
 
   return (
     <div className="shx">
@@ -487,7 +734,7 @@ export default function Collaboration() {
           </h1>
           <p className="shx-hero-sub">
             Invite the people, attach your own handoff files, then build an export from what actually exists in the
-            workspace. Roles stay enforced; nothing leaves the browser without a download.
+            workspace. Roles stay enforced; files and exports stay with the workspace.
           </p>
           <div className="shx-hero-actions">
             <button className="shx-btn lime" onClick={openPicker}>
@@ -501,10 +748,10 @@ export default function Collaboration() {
             <span><b>{members.length}</b> people</span>
             <span><b>{pending.length}</b> pending</span>
             <span><b>{exportsLog.length}</b> exports</span>
-            <span><b>{uploads.length}</b> files attached</span>
+            <span><b>{attachments.length}</b> files stored</span>
           </div>
         </div>
-        <ShareCore people={members.length} files={uploads.length} exportsCount={exportsLog.length} pending={pending.length} />
+        <ShareCore people={members.length} files={attachments.length} exportsCount={exportsLog.length} pending={pending.length} />
       </motion.header>
 
       <section className="shx-kpis" aria-label="Share summary">
@@ -564,11 +811,11 @@ export default function Collaboration() {
             Handoff files
           </div>
           <div className="shx-kpi-mid">
-            <b>{uploads.length}</b>
+            <b>{attachments.length}</b>
             <span className="shx-filestack" aria-hidden><i /><i /><i /></span>
           </div>
           <div className="shx-kpi-foot">
-            {uploads.length ? `${prettySize(totalUploadBytes)} · session only` : "Bring your own PDF, CSV, JSON…"}
+            {attachments.length ? `${prettySize(totalUploadBytes)} · stored in workspace` : "Bring your own PDF, CSV, JSON…"}
           </div>
         </article>
       </section>
@@ -586,27 +833,30 @@ export default function Collaboration() {
             <h2 id="shx-upload-title">Bring your own files</h2>
             <p>Drop the artefacts the workspace cannot generate — figures, posters, raw data, signed PDFs. Each file is checked before it joins the handoff.</p>
           </div>
-          {uploads.length > 0 && (
+          {(attachments.length > 0 || pendingUploads.length > 0) && (
             <div className="shx-upload-actions">
-              <span>{uploads.length} file{uploads.length === 1 ? "" : "s"} · {prettySize(totalUploadBytes)}</span>
-              <button onClick={clearFiles}>Clear all</button>
+              <span>
+                {attachments.length} file{attachments.length === 1 ? "" : "s"} · {prettySize(totalUploadBytes)}
+                {pendingBytes > 0 && ` · ${prettySize(pendingBytes)} uploading`}
+              </span>
+              <button onClick={() => void clearFiles()}>Clear all</button>
             </div>
           )}
         </div>
 
         <div className="shx-up-grid">
           <label
-            className={`shx-drop${dragging ? " is-drag" : ""}`}
+            className={`shx-drop${dragOver ? " is-drag" : ""}`}
             htmlFor="shx-file"
             tabIndex={0}
             onKeyDown={dropKey}
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragEnter={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false); }}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragEnter={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false); }}
             onDrop={(e) => {
               e.preventDefault();
-              setDragging(false);
-              addFiles(e.dataTransfer.files);
+              setDragOver(false);
+              void addFiles(e.dataTransfer.files);
             }}
           >
             <input
@@ -618,25 +868,25 @@ export default function Collaboration() {
               tabIndex={-1}
               accept={FILE_ACCEPT}
               onChange={(e) => {
-                addFiles(e.target.files);
+                void addFiles(e.target.files);
                 e.target.value = "";
               }}
             />
             <span className="shx-drop-ic"><Ico name="upload" /></span>
-            <b>{dragging ? "Release to attach" : "Drop files here"}</b>
+            <b>{dragOver ? "Release to attach" : "Drop files here"}</b>
             <span className="shx-drop-sub">or <span className="shx-browse">browse your device</span> · {prettySize(MAX_FILE_BYTES)} each</span>
             <span className="shx-drop-formats" aria-hidden>
               {UPLOAD_FORMATS.slice(0, 5).map((f) => <i key={f.kind}>{f.label}</i>)}
               <i>+4 more</i>
             </span>
-            <span className="shx-drop-privacy"><Ico name="shield" /> Validated in the browser. Never uploaded.</span>
+            <span className="shx-drop-privacy"><Ico name="shield" /> Encrypted in transit · stored in your workspace.</span>
           </label>
 
           <div className="shx-tray">
             <div className="shx-tray-head">
-              <span className="shx-kicker">Session tray</span>
-              <span className="shx-tray-count" aria-live="polite">{uploads.length}</span>
-              {uploads.length > 0 && (
+              <span className="shx-kicker">Workspace files</span>
+              <span className="shx-tray-count" aria-live="polite">{attachments.length + pendingUploads.length}</span>
+              {attachments.length + pendingUploads.length > 0 && (
                 <label className="shx-file-search">
                   <Ico name="search" />
                   <input
@@ -649,7 +899,13 @@ export default function Collaboration() {
               )}
             </div>
 
-            {uploads.length === 0 ? (
+            {filesLoading ? (
+              <div className="shx-tray-empty">
+                <span className="shx-load-dot" aria-hidden><i /><i /><i /></span>
+                <b>Loading stored files…</b>
+                <span>Fetching this workspace’s attachment index.</span>
+              </div>
+            ) : attachments.length + pendingUploads.length === 0 ? (
               <div className="shx-tray-empty">
                 <span className="shx-empty-stack" aria-hidden><i /><i /><i /></span>
                 <b>No files attached yet</b>
@@ -659,7 +915,37 @@ export default function Collaboration() {
               <>
                 <ul className="shx-files">
                   <AnimatePresence initial={false}>
-                    {shownFiles.map((f) => (
+                    {shownPending.map((f) => (
+                      <motion.li
+                        key={f.id}
+                        layout
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 10 }}
+                        transition={{ duration: 0.2 }}
+                        className={`shx-file is-${f.status}`}
+                      >
+                        <span className={`shx-file-ic f-${f.kind}`}><FileGlyph kind={f.kind} /></span>
+                        <span className="shx-file-main">
+                          <b title={f.file.name}>{f.file.name}</b>
+                          <small>{f.status === "uploading" ? "Uploading to the workspace…" : f.error || "Upload failed"}</small>
+                        </span>
+                        <span className={`shx-file-state ${f.status}`}>{f.status === "uploading" ? "Uploading" : "Failed"}</span>
+                        <span className="shx-file-actions">
+                          {f.status === "failed" && (
+                            <button onClick={() => retryUpload(f)} aria-label={`Retry ${f.file.name}`} title="Retry upload">
+                              <Ico name="retry" />
+                            </button>
+                          )}
+                          {f.status === "failed" && (
+                            <button onClick={() => removePending(f.id)} aria-label={`Dismiss ${f.file.name}`} title="Dismiss">
+                              <Ico name="trash" />
+                            </button>
+                          )}
+                        </span>
+                      </motion.li>
+                    ))}
+                    {shownAttachments.map((f) => (
                       <motion.li
                         key={f.id}
                         layout
@@ -669,17 +955,17 @@ export default function Collaboration() {
                         transition={{ duration: 0.2 }}
                         className="shx-file"
                       >
-                        <span className={`shx-file-ic f-${f.kind}`}><FileGlyph kind={f.kind} /></span>
+                        <span className={`shx-file-ic f-${f.kind}`}><FileGlyph kind={f.kind as FileKind} /></span>
                         <span className="shx-file-main">
-                          <b title={f.file.name}>{f.file.name}</b>
-                          <small>{formatLabel(f.kind)} · {f.ext} · {prettySize(f.file.size)}</small>
+                          <b title={f.name}>{f.name}</b>
+                          <small>{formatLabel(f.kind as FileKind)} · {f.ext} · {prettySize(f.size)}</small>
                         </span>
-                        <span className="shx-file-state">Ready</span>
+                        <span className="shx-file-state">Stored</span>
                         <span className="shx-file-actions">
-                          <button onClick={() => downloadBlob(f.file.name, f.file)} aria-label={`Download ${f.file.name}`} title="Download original">
+                          <button onClick={() => void saveAttachment(f)} aria-label={`Download ${f.name}`} title="Download original">
                             <Ico name="download" />
                           </button>
-                          <button onClick={() => removeFile(f.id)} aria-label={`Remove ${f.file.name}`} title="Remove">
+                          <button onClick={() => void removeFile(f.id, f.name)} aria-label={`Remove ${f.name}`} title="Remove">
                             <Ico name="trash" />
                           </button>
                         </span>
@@ -687,7 +973,7 @@ export default function Collaboration() {
                     ))}
                   </AnimatePresence>
                 </ul>
-                {shownFiles.length === 0 && (
+                {shownAttachments.length + shownPending.length === 0 && (
                   <p className="shx-tray-none">No attached file matches “{fileQuery.trim()}”.</p>
                 )}
               </>
@@ -711,7 +997,7 @@ export default function Collaboration() {
         <div className="shx-formats">
           <div className="shx-formats-head">
             <span className="shx-kicker">Accepted here</span>
-            <span>{prettySize(MAX_FILE_BYTES)} per file · {prettySize(MAX_TOTAL_BYTES)} per session</span>
+            <span>{prettySize(MAX_FILE_BYTES)} per file · {prettySize(MAX_TOTAL_BYTES)} per workspace</span>
           </div>
           <ul className="shx-format-grid">
             {UPLOAD_FORMATS.map((f) => (
@@ -745,7 +1031,7 @@ export default function Collaboration() {
             {myRole && <Badge tone="lime">{myRole}</Badge>}
           </div>
 
-          <form className="shx-invite" onSubmit={submitInvite} noValidate>
+          <form className="shx-invite" onSubmit={(e) => void submitInvite(e)} noValidate>
             <label className="shx-input" htmlFor="shx-email">
               <span className="shx-input-lbl">Email</span>
               <span className="shx-input-box">
@@ -755,7 +1041,10 @@ export default function Collaboration() {
                   type="email"
                   placeholder="teammate@lab.org"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (mailState) setMailState(null);
+                  }}
                   disabled={!owner}
                   autoComplete="off"
                 />
@@ -775,9 +1064,22 @@ export default function Collaboration() {
                 </button>
               ))}
             </div>
-            <button className="shx-btn lime" type="submit" disabled={!owner}>Invite</button>
+            <button className="shx-btn lime" type="submit" disabled={!owner || sendingInvite}>
+              {sendingInvite ? "Sending…" : "Invite"}
+            </button>
           </form>
           {!owner && <p className="shx-hint">Only the workspace owner can invite or change roles.</p>}
+          {mailState && (
+            <div className={`shx-mailstate ${mailState.tone}`} role="status" aria-live="polite">
+              <span className="shx-mailstate-dot" aria-hidden="true">{mailState.tone === "ok" ? "✓" : "!"}</span>
+              <p>{mailState.text}</p>
+              {mailState.mailto && (
+                <a className="shx-mailstate-link" href={mailState.mailto}>
+                  Open mail app
+                </a>
+              )}
+            </div>
+          )}
 
           <ul className="shx-people">
             {members.map((m: Membership) => {
@@ -839,7 +1141,7 @@ export default function Collaboration() {
               maxLength={240}
               rows={2}
               placeholder="Add context — what should they look at first?"
-              aria-label="Message included in the copied invitation"
+              aria-label="Message included in the invitation email and copied invite"
             />
             <div className="shx-note-foot">
               <code>{origin}/login</code>
@@ -849,7 +1151,7 @@ export default function Collaboration() {
               </button>
             </div>
           </div>
-          <p className="shx-fine">Invitations are recorded in this workspace; this prototype does not send email. Attachments stay in this browser session.</p>
+          <p className="shx-fine">Invitations are recorded in this workspace and emailed when delivery is configured. Attachments are stored with the workspace, not in this tab.</p>
         </motion.section>
 
         <motion.aside
@@ -923,7 +1225,7 @@ export default function Collaboration() {
             </div>
             <button onClick={() => copy(`${origin}/login`, "link")}>{copied === "link" ? "✓" : "Copy"}</button>
           </div>
-          <p className="shx-fine">Exports are built in your browser from workspace data — nothing is uploaded. Uploaded files are listed by name, type and size only.</p>
+          <p className="shx-fine">Exports are generated in the browser from workspace data. Attached files are stored with the workspace; the report lists their name, type and size.</p>
         </motion.aside>
       </div>
 
@@ -989,8 +1291,8 @@ export default function Collaboration() {
                 })}
               </div>
               <p className="shx-sections-note">
-                {uploads.length
-                  ? `${uploads.length} attached file${uploads.length === 1 ? "" : "s"} will be listed in the report manifest.`
+                {attachments.length
+                  ? `${attachments.length} attached file${attachments.length === 1 ? "" : "s"} will be listed in the report manifest.`
                   : "Attach files above to list them in the report manifest."}
               </p>
             </div>
@@ -998,8 +1300,16 @@ export default function Collaboration() {
             <div className="shx-runbar">
               <div className="shx-runbar-note">
                 <b>{filename}</b>
-                <span>saved to your downloads folder</span>
+                <span>download the export, or bundle it with every stored file</span>
               </div>
+              <button
+                className="shx-btn ghost"
+                onClick={() => void runBundle()}
+                disabled={bundling || !attachments.length}
+                title={attachments.length ? "ZIP the selected export with all stored files" : "Attach files first"}
+              >
+                <Ico name="download" /> {bundling ? "Bundling…" : "Bundle .zip"}
+              </button>
               <button className="shx-btn lime" onClick={() => run()}>
                 <Ico name="export" /> Generate &amp; download
               </button>
