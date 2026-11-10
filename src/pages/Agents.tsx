@@ -146,7 +146,7 @@ export default function Agents() {
   }, [agents]);
   const weekTotal = weekData.reduce((sum, day) => sum + day.count, 0);
   const weekMax = Math.max(1, ...weekData.map(day => day.count));
-  const peakDay = weekData.reduce((best, day, i) => day.count > weekData[best].count ? i : best, 0);
+  const peakDay = weekData.reduce((best, day, i) => day.count >= weekData[best].count ? i : best, 0);
   const activityLabel = `Agent runs per day over the last seven days: ${weekData.map(day => `${day.label} ${day.count}`).join(", ")}.`;
 
   const outcomeGroups = [

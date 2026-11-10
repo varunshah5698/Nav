@@ -58,7 +58,7 @@
   display:flex;flex-direction:column;gap:13px;box-shadow:var(--db-shadow);transition:transform .2s ease,border-color .2s ease}
 .db-kpi:hover{transform:translateY(-1px);border-color:rgba(255,255,255,.16)}
 .db-kpi::after{content:"";position:absolute;right:-34px;top:-44px;width:116px;height:116px;border-radius:50%;pointer-events:none;
-  background:radial-gradient(circle,rgba(240,128,90,.15),rgba(240,128,90,0) 68%)}
+  background:radial-gradient(circle,rgba(240,128,90,.06),rgba(240,128,90,0) 68%)}
 .db-kpi-lbl{font-size:11.5px;font-weight:550;color:var(--db-muted);letter-spacing:.005em;position:relative;z-index:1}
 .db-kpi-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;position:relative;z-index:1}
 .db-kpi-row b{font-size:27px;font-weight:650;letter-spacing:-.035em;line-height:.95;color:#F7F5EE;font-variant-numeric:tabular-nums}

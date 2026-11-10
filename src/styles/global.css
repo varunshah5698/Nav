@@ -161,14 +161,15 @@ label.lbl{font-size:12px;font-weight:700;color:var(--muted);display:block;margin
   --bad:#FF937A;--bad-bg:rgba(255,147,122,.14);
   --shadow-card:0 1px 2px rgba(0,0,0,.18),0 12px 30px -18px rgba(0,0,0,.55);
   --shadow-pop:0 20px 50px -20px rgba(0,0,0,.85);
+  --font:"Manrope","Inter","Plus Jakarta Sans",-apple-system,"Segoe UI",Roboto,sans-serif;
   background:
-  radial-gradient(900px 480px at 82% -6%,rgba(240,150,110,.22),rgba(240,150,110,0) 62%),
-  radial-gradient(760px 460px at 8% 12%,rgba(160,178,156,.14),rgba(160,178,156,0) 64%),
-  radial-gradient(1000px 600px at 50% 110%,rgba(111,208,140,.08),rgba(111,208,140,0) 60%),
-  linear-gradient(155deg,#252723 0%,#1B1D1A 46%,#131512 100%);
+  radial-gradient(900px 480px at 82% -6%,rgba(243,112,63,.14),rgba(243,112,63,0) 62%),
+  radial-gradient(760px 460px at 8% 12%,rgba(190,176,160,.09),rgba(190,176,160,0) 64%),
+  radial-gradient(1000px 600px at 50% 110%,rgba(120,105,90,.08),rgba(120,105,90,0) 60%),
+  linear-gradient(158deg,#363330 0%,#292725 46%,#1C1A18 100%);
   color:#EDEBE6}
-.theme-dash .rg-top{background:rgba(40,42,38,.62);border-color:rgba(255,255,255,.1);box-shadow:0 24px 55px -30px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.08)}
-.theme-dash .rg-side{background:linear-gradient(180deg,rgba(37,39,35,.86),rgba(21,23,20,.72));border-color:rgba(255,255,255,.08);box-shadow:inset -1px 0 0 rgba(255,255,255,.04)}
+.theme-dash .rg-top{background:rgba(51,48,44,.62);border-color:rgba(255,255,255,.1);box-shadow:0 24px 55px -30px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.08)}
+.theme-dash .rg-side{background:linear-gradient(180deg,rgba(45,42,38,.86),rgba(26,24,21,.72));border-color:rgba(255,255,255,.08);box-shadow:inset -1px 0 0 rgba(255,255,255,.04)}
 .theme-dash .rg-side-foot{border-color:rgba(255,255,255,.08)}
 .theme-dash .rg-side-logout{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.1);color:#EDEAE2}
 .theme-dash .rg-side-logout:hover{background:rgba(255,255,255,.13)}
@@ -196,13 +197,13 @@ label.lbl{font-size:12px;font-weight:700;color:var(--muted);display:block;margin
 .theme-dash .rg-who b{color:#F4F2EB}
 .theme-dash .rg-who span{color:#9C9A93}
 .theme-dash .rg-avatar{background:linear-gradient(145deg,#F0C3A3,#C9784F);color:#2B1B12}
-.theme-dash .rg-profile-menu{background:#242622;border-color:rgba(255,255,255,.1);box-shadow:0 24px 60px -24px rgba(0,0,0,.9)}
+.theme-dash .rg-profile-menu{background:#292622;border-color:rgba(255,255,255,.1);box-shadow:0 24px 60px -24px rgba(0,0,0,.9)}
 .theme-dash .rg-profile-mail{color:#A5A29A;border-color:rgba(255,255,255,.08)}
 .theme-dash .rg-profile-ws{border-color:rgba(255,255,255,.08)}
 .theme-dash .rg-profile-ws select{background:#1C1E1B;border-color:rgba(255,255,255,.12);color:#EDEAE2}
 .theme-dash .rg-profile-menu a,.theme-dash .rg-profile-menu button{color:#EDEAE2}
 .theme-dash .rg-profile-menu a:hover,.theme-dash .rg-profile-menu button:hover{background:rgba(255,255,255,.07)}
-.theme-dash .rg-mobile-nav{background:rgba(38,40,36,.94);border-color:rgba(255,255,255,.1)}
+.theme-dash .rg-mobile-nav{background:rgba(45,42,38,.94);border-color:rgba(255,255,255,.1)}
 .theme-dash .rg-mobile-nav a{color:#C4C2BA}
 .theme-dash .rg-mobile-nav a.active{background:rgba(240,128,90,.16);color:#FFAC8A}
 .theme-dash .rg-mobile-nav a.active .rg-nav-ic{background:rgba(255,172,138,.18)}

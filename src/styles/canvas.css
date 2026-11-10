@@ -12,9 +12,9 @@
   --cv-muted-2:#A8A39C;
   --cv-line:rgba(255,255,255,.08);
   --cv-line-soft:rgba(255,255,255,.055);
-  --cv-paper:#1B1A18;
+  --cv-paper:#242220;
   --cv-card:rgba(255,255,255,.055);
-  --cv-card-solid:#232220;
+  --cv-card-solid:#2A2825;
   --cv-green:#82E78F;
   --cv-gold:#F2B64B;
   --cv-red:#FF937A;
@@ -138,7 +138,7 @@
 /* ---------- command bar ---------- */
 .cv-bar{
   display:flex;align-items:center;gap:8px;flex-wrap:wrap;row-gap:8px;
-  padding:11px 12px;background:rgba(28,27,25,.92);
+  padding:11px 12px;background:rgba(40,38,35,.92);
   border-bottom:1px solid var(--cv-line);position:relative;z-index:9;backdrop-filter:blur(8px);
 }
 .cv-search{
@@ -206,7 +206,7 @@
 
 /* ---------- flow area ---------- */
 .cv-flow{position:relative;flex:1;min-height:0;background:
-  radial-gradient(120% 95% at 50% -10%,#262421 0%,#1B1A18 72%)}
+  radial-gradient(120% 95% at 50% -10%,#2A2825 0%,#1F1E1C 72%)}
 .cv-flow .react-flow{background:transparent}
 .react-flow__pane{cursor:default}
 .react-flow__node{font-family:var(--font);transition:opacity .26s ease,filter .26s ease}
