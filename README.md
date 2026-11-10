@@ -7,7 +7,7 @@ Cinematic landing + auth + dashboard + 7 modules (Canvas, Sources, Agents, Exper
 npm install
 npm run dev      # → http://localhost:5173
 ```
-Register (any email) → demo workspace seeds automatically. Login persists locally.
+Register with Google → demo workspace seeds automatically. Google-only accounts can add an email + password after a verified OTP reset. Login persists through Convex Auth.
 
 **Live:** <https://researchgraph-steel.vercel.app> — static Vite build on Vercel with the analyst endpoint in `api/`. The AI Analyst reports offline until `GROQ_API_KEY` is set in the Vercel project.
 
@@ -24,9 +24,10 @@ Register (any email) → demo workspace seeds automatically. Login persists loca
 
 ## Authentication & cloud sync (Convex Auth)
 
-Convex is the authentication authority and the cloud store. There is no local
-account system: `users`/password hashes were removed, and the store only mirrors
-the identity returned by `ctx.auth.getUserIdentity()`.
+Convex is the authentication authority and the cloud store. Google and
+email/password are both supported; a Google-only account can add a password
+through the verified-email reset flow. The store only mirrors the identity
+returned by `ctx.auth.getUserIdentity()`.
 
 Two providers, both permanent Convex accounts:
 
@@ -37,21 +38,56 @@ Two providers, both permanent Convex accounts:
   First authorization creates the account; later ones resume it.
 
 ```
-email/password or Google -> Convex Auth session
+Google OAuth -> convex.site/api/auth/callback/google -> Convex Auth session
+email/password -> Convex Auth Password provider -> Convex Auth session
    -> useConvexAuth()/users.me -> store.startSession(server identity)
    -> snapshots.get/save (ownership from getAuthUserId, never from the client)
 ```
 
-- `convex/auth.ts` — `Password` + Google (`@auth/core`) providers.
+- `convex/auth.ts` — `Password` + Google providers (`@convex-dev/auth/server`).
+- `convex/passwordPolicy.ts` — shared server/client password requirements.
+- `convex/passwordReset.ts` — OTP issue/verify/complete actions and rate limits.
 - `convex/http.ts` — `/api/auth/*` HTTP routes.
 - `convex/schema.ts` — `authTables` + `userSnapshots` (one per Convex user) +
-  legacy `snapshots` (kept read-only; never exposed by a function).
+  `passwordResetOtps` / `passwordResetTokens` (hashes only) + legacy `snapshots`.
 - `convex/snapshots.ts` — `get`/`save` take **no userId**; unauthenticated calls throw.
 - `convex/users.ts` — `me` returns name/email/photo for the signed-in user.
 - `src/lib/useCloudSync.ts` — wipes cached data on sign-out, refuses snapshots whose
   server-reported `userId` differs from the session, debounces saves, flushes on hide.
 - `src/components/Shell.tsx` — Google photo/name/email + real sign-out.
-- `src/pages/Auth.tsx` — Google-only sign-in; redirects authenticated visitors.
+- `src/pages/Auth.tsx` — Google sign-in, email/password sign-in, and the OTP reset flow.
+
+### Email OTP password reset
+
+`/forgot-password` is a four-step flow: email → six-digit OTP → new password →
+success. The OTP is six digits from a CSPRNG, stored only as a salted SHA-256
+hash, expires after five minutes, is single-use, and is invalidated by a newer
+request. Five wrong attempts lock the current code; requests are limited to one
+per 60 seconds, five per email per hour, and twenty per IP per hour. Verification
+returns a short-lived, single-use reset token; the password update action
+consumes it and uses Convex Auth's `modifyAccountCredentials` / `createAccount`
+helpers (Scrypt hashing from the Password provider). A Google-only account gets
+password credentials linked to the same user id after the OTP proves email
+ownership — no duplicate user is created. Successful resets invalidate the
+account's existing sessions.
+
+OTP emails are sent through Brevo's transactional API from the verified sender
+`BREVO_SENDER_EMAIL` / `BREVO_SENDER_NAME`:
+
+```bash
+npx convex env set BREVO_API_KEY <brevo-api-key>
+npx convex env set BREVO_SENDER_EMAIL varunshah0010@gmail.com
+npx convex env set BREVO_SENDER_NAME ResearchGraph
+```
+
+`BREVO_API_KEY` and the sender settings live only in the Convex deployment
+environment — never in `.env.local`, never in a `VITE_` variable, never in git.
+
+Deploy the schema/functions with `npx convex deploy`, set `SITE_URL` on the
+Convex deployment to the public app origin (for the Render service:
+`https://nav-y35d.onrender.com`), and build the frontend with
+`VITE_CONVEX_URL` pointing at that deployment. No Brevo variable needs to be
+set on Render itself.
 
 ### Google Cloud Console setup (one-time)
 

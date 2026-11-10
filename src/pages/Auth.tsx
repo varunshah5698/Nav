@@ -1,10 +1,12 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { LogoMark } from "../components/Logo";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useAction, useMutation } from "convex/react";
 import { useAuthActions, useConvexAuth } from "@convex-dev/auth/react";
+import { api } from "../../convex/_generated/api";
 import "../styles/auth.css";
 
 const Universe = lazy(() => import("../components/AuthScene"));
@@ -54,6 +56,20 @@ const BackIcon = () => (
     <path d="M19 12H6M11 6l-6 6 6 6" />
   </svg>
 );
+const ShieldCheckIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 3 20 6v5.5c0 5.2-3.3 8.2-8 9.5-4.7-1.3-8-4.3-8-9.5V6Z" />
+    <path d="m8.7 12 2.2 2.2 4.4-4.4" />
+  </svg>
+);
+
+const CheckCircleIcon = () => (
+  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" />
+    <path d="m7.8 12.2 2.8 2.8 5.7-5.7" />
+  </svg>
+);
+
 const AlertIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
     <circle cx="12" cy="12" r="9" />
@@ -274,6 +290,12 @@ function PasswordForm({ mode }: { mode: Mode }) {
         </button>
       </div>
 
+      {!register && (
+        <div className="auth-forgot-row">
+          <Link to="/forgot-password" className="auth-inline-link">Forgot password?</Link>
+        </div>
+      )}
+
       {register && (
         <>
           <div className="auth-gap" />
@@ -352,8 +374,15 @@ function AuthOptions({ mode }: { mode: Mode }) {
 /* ---------- pages ---------- */
 export function Login() {
   useRedirectIfSignedIn();
+  const [params] = useSearchParams();
   return (
     <Frame mode="login" title="Welcome back" sub={<>Sign in to open <b>your research workspace</b>.</>}>
+      {params.get("reset") === "1" && (
+        <div className="auth-success" role="status">
+          <ShieldCheckIcon />
+          <span>Password updated. Sign in with your new password.</span>
+        </div>
+      )}
       <AuthOptions mode="login" />
     </Frame>
   );
@@ -364,6 +393,326 @@ export function Register() {
   return (
     <Frame mode="register" title="Create your account" sub={<>Email and password, or <b>continue with Google</b>.</>}>
       <AuthOptions mode="register" />
+    </Frame>
+  );
+}
+/* ---------- forgot password ---------- */
+type ResetStep = "email" | "otp" | "password" | "done";
+
+function formatClock(totalSeconds: number): string {
+  const seconds = Math.max(0, totalSeconds);
+  return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`;
+}
+
+function passwordScore(password: string): number {
+  let score = 0;
+  if (password.length >= 8) score += 1;
+  if (/[A-Za-z]/.test(password)) score += 1;
+  if (/[0-9]/.test(password)) score += 1;
+  if (/[^A-Za-z0-9]/.test(password) || password.length >= 12) score += 1;
+  return score;
+}
+
+export function ForgotPassword() {
+  const requestReset = useAction(api.passwordReset.requestPasswordReset);
+  const verifyOtp = useMutation(api.passwordReset.verifyPasswordResetOtp);
+  const completeReset = useAction(api.passwordReset.completePasswordReset);
+  const nav = useNavigate();
+
+  const [step, setStep] = useState<ResetStep>("email");
+  const [email, setEmail] = useState("");
+  const [digits, setDigits] = useState<string[]>(Array(6).fill(""));
+  const [token, setToken] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [requestedAt, setRequestedAt] = useState(0);
+  const [now, setNow] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [locked, setLocked] = useState(false);
+  const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
+
+  useEffect(() => {
+    if (step !== "otp") return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [step]);
+
+  useEffect(() => {
+    if (step !== "done") return;
+    const timer = window.setTimeout(() => nav("/login?reset=1", { replace: true }), 4200);
+    return () => window.clearTimeout(timer);
+  }, [step, nav]);
+
+  const resendLeft = requestedAt ? Math.max(0, 60 - Math.floor((now - requestedAt) / 1000)) : 0;
+  const expiresLeft = requestedAt ? Math.max(0, 300 - Math.floor((now - requestedAt) / 1000)) : 0;
+  const fullCode = digits.join("");
+  const score = passwordScore(password);
+
+  const stepCopy =
+    step === "email"
+      ? { title: "Reset your password", sub: <>Enter the email on your account. We will send a <b>six-digit code</b> to verify it.</> }
+      : step === "otp"
+        ? { title: "Check your email", sub: <>We sent a code to <b>{email}</b>. It expires in five minutes.</> }
+        : step === "password"
+          ? { title: "Choose a new password", sub: <>Use at least eight characters including a letter and a number.</> }
+          : { title: "Password updated", sub: <>Your password has been changed and existing sessions were signed out.</> };
+
+  async function requestCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    const normalized = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setLocked(false);
+    try {
+      await requestReset({ email: normalized });
+      setEmail(normalized);
+      setDigits(Array(6).fill(""));
+      setRequestedAt(Date.now());
+      setNow(Date.now());
+      setStep("otp");
+      window.setTimeout(() => otpRefs.current[0]?.focus(), 60);
+    } catch {
+      setError("Could not send a code right now. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendCode() {
+    if (busy || resendLeft > 0) return;
+    setBusy(true);
+    setError("");
+    try {
+      await requestReset({ email });
+      setDigits(Array(6).fill(""));
+      setLocked(false);
+      setRequestedAt(Date.now());
+      setNow(Date.now());
+      window.setTimeout(() => otpRefs.current[0]?.focus(), 60);
+    } catch {
+      setError("Could not resend the code. Try again in a moment.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verify(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy || fullCode.length !== 6) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await verifyOtp({ email, code: fullCode });
+      if (!result.ok) {
+        setError(result.error ?? "Invalid or expired code.");
+        if (result.locked) setLocked(true);
+        return;
+      }
+      setToken(result.token ?? "");
+      setStep("password");
+    } catch {
+      setError("Could not verify the code. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function savePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+      setError("Use at least eight characters including a letter and a number.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const result = await completeReset({ token, password });
+      if (!result.ok) {
+        setError(result.error ?? "Could not update the password.");
+        return;
+      }
+      setStep("done");
+    } catch {
+      setError("Could not update the password. Request a new code and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function updateDigit(index: number, value: string) {
+    const clean = value.replace(/\D/g, "");
+    if (clean.length > 1) {
+      fillDigits(clean, index);
+      return;
+    }
+    const next = [...digits];
+    next[index] = clean.slice(-1);
+    setDigits(next);
+    if (clean && index < 5) otpRefs.current[index + 1]?.focus();
+  }
+
+  function fillDigits(value: string, start = 0) {
+    const source = value.replace(/\D/g, "").slice(0, 6 - start);
+    if (!source) return;
+    const next = [...digits];
+    source.split("").forEach((digit, offset) => { next[start + offset] = digit; });
+    setDigits(next);
+    otpRefs.current[Math.min(start + source.length, 5)]?.focus();
+  }
+
+  function onOtpKeyDown(index: number, event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Backspace" && !digits[index] && index > 0) {
+      event.preventDefault();
+      const next = [...digits];
+      next[index - 1] = "";
+      setDigits(next);
+      otpRefs.current[index - 1]?.focus();
+    } else if (event.key === "ArrowLeft" && index > 0) {
+      event.preventDefault();
+      otpRefs.current[index - 1]?.focus();
+    } else if (event.key === "ArrowRight" && index < 5) {
+      event.preventDefault();
+      otpRefs.current[index + 1]?.focus();
+    }
+  }
+
+  if (step === "done") {
+    return (
+      <Frame mode="login" title={stepCopy.title} sub={stepCopy.sub}>
+        <div className="auth-success auth-success-large" role="status">
+          <span className="auth-success-icon"><CheckCircleIcon /></span>
+          <div>
+            <b>All set.</b>
+            <p>You can now sign in with your new password. Redirecting you to sign in…</p>
+          </div>
+        </div>
+        <button className="auth-submit" type="button" onClick={() => nav("/login?reset=1", { replace: true })}>
+          Back to sign in <ArrowIcon />
+        </button>
+      </Frame>
+    );
+  }
+
+  return (
+    <Frame mode="login" title={stepCopy.title} sub={stepCopy.sub}>
+      {error && <Alert>{error}</Alert>}
+
+      {step === "email" && (
+        <form onSubmit={requestCode} noValidate>
+          <label className="auth-label" htmlFor="reset-email">Email</label>
+          <div className="auth-field">
+            <span className="fi"><MailIcon /></span>
+            <input id="reset-email" type="email" autoComplete="email" value={email}
+              onChange={(e) => setEmail(e.target.value)} placeholder="you@lab.edu" autoFocus required />
+          </div>
+          <p className="auth-hint" style={{ marginTop: 10 }}>
+            For privacy, we show the same confirmation whether or not an account exists.
+          </p>
+          <button className="auth-submit" type="submit" disabled={busy}>
+            {busy ? <><span className="auth-spin" aria-hidden="true" /> Sending code</> : <>Send reset code <ArrowIcon /></>}
+          </button>
+          <p className="auth-foot">
+            Remembered it? <Link to="/login">Back to sign in</Link>
+          </p>
+        </form>
+      )}
+
+      {step === "otp" && (
+        <form onSubmit={verify} noValidate>
+          <div className="auth-otp" role="group" aria-label="Six-digit verification code">
+            {digits.map((digit, index) => (
+              <input
+                key={index}
+                ref={(element) => { otpRefs.current[index] = element; }}
+                className={`auth-otp-box${digit ? " filled" : ""}`}
+                value={digit}
+                onChange={(e) => updateDigit(index, e.target.value)}
+                onKeyDown={(e) => onOtpKeyDown(index, e)}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  fillDigits(e.clipboardData.getData("text"), index);
+                }}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete={index === 0 ? "one-time-code" : "off"}
+                maxLength={1}
+                aria-label={`Digit ${index + 1} of 6`}
+                disabled={locked}
+              />
+            ))}
+          </div>
+          <div className="auth-countdown" aria-live="polite">
+            {locked
+              ? "Too many attempts. Request a new code."
+              : expiresLeft > 0
+                ? `Code expires in ${formatClock(expiresLeft)}`
+                : "Code expired. Request a new one."}
+          </div>
+          <button className="auth-submit" type="submit" disabled={busy || fullCode.length !== 6 || locked || expiresLeft === 0}>
+            {busy ? <><span className="auth-spin" aria-hidden="true" /> Verifying</> : <>Verify code <ArrowIcon /></>}
+          </button>
+          <div className="auth-resend-row">
+            {resendLeft > 0 ? (
+              <span className="auth-hint">Resend code in {formatClock(resendLeft)}</span>
+            ) : (
+              <button type="button" className="auth-inline-link" onClick={resendCode} disabled={busy}>
+                Resend code
+              </button>
+            )}
+            <button type="button" className="auth-inline-link" onClick={() => { setStep("email"); setError(""); }}>
+              Use a different email
+            </button>
+          </div>
+        </form>
+      )}
+
+      {step === "password" && (
+        <form onSubmit={savePassword} noValidate>
+          <label className="auth-label" htmlFor="new-password">New password</label>
+          <div className="auth-field">
+            <span className="fi"><LockIcon /></span>
+            <input id="new-password" type={showPassword ? "text" : "password"} value={password}
+              onChange={(e) => setPassword(e.target.value)} autoComplete="new-password"
+              placeholder="At least 8 characters" autoFocus required />
+            <button type="button" className="auth-eye" onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword}>
+              <EyeIcon off={showPassword} />
+            </button>
+          </div>
+          <div className={`auth-strength score-${score}`} aria-label={`Password strength: ${["very weak", "weak", "fair", "good", "strong"][score]}`}>
+            <div className="auth-strength-bars">{[0, 1, 2, 3].map((i) => <i key={i} className={i < score ? "on" : ""} />)}</div>
+            <span>{["Too weak", "Weak", "Fair", "Good", "Strong"][score]}</span>
+          </div>
+          <div className="auth-gap" />
+          <label className="auth-label" htmlFor="confirm-password">Confirm password</label>
+          <div className="auth-field">
+            <span className="fi"><LockIcon /></span>
+            <input id="confirm-password" type={showPassword ? "text" : "password"} value={confirm}
+              onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password"
+              placeholder="Repeat your password" required />
+          </div>
+          <button className="auth-submit" type="submit" disabled={busy}>
+            {busy ? <><span className="auth-spin" aria-hidden="true" /> Updating password</> : <>Update password <ArrowIcon /></>}
+          </button>
+          <p className="auth-foot">
+            <button type="button" className="auth-inline-link" onClick={() => { setStep("otp"); setError(""); }}>
+              Use a new code
+            </button>
+          </p>
+        </form>
+      )}
     </Frame>
   );
 }

@@ -9,7 +9,10 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as crons from "../crons.js";
 import type * as http from "../http.js";
+import type * as passwordPolicy from "../passwordPolicy.js";
+import type * as passwordReset from "../passwordReset.js";
 import type * as snapshots from "../snapshots.js";
 import type * as users from "../users.js";
 
@@ -21,7 +24,10 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  crons: typeof crons;
   http: typeof http;
+  passwordPolicy: typeof passwordPolicy;
+  passwordReset: typeof passwordReset;
   snapshots: typeof snapshots;
   users: typeof users;
 }>;

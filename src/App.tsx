@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-
 import { useQuery } from "convex/react";
 import { useConvexAuth } from "@convex-dev/auth/react";
 import Landing from "./pages/Landing";
-import { Login, Register } from "./pages/Auth";
+import { Login, Register, ForgotPassword } from "./pages/Auth";
 import Shell from "./components/Shell";
 import Dashboard from "./pages/Dashboard";
 import Analyst from "./pages/Analyst";
@@ -48,6 +48,7 @@ export default function App(){
       <Route path="/login" element={<Login/>}/>
       <Route path="/register" element={<Register/>}/>
       <Route path="/signup" element={<Register/>}/>
+      <Route path="/forgot-password" element={<ForgotPassword/>}/>
       <Route path="/app/dashboard" element={<Guard><Dashboard/></Guard>}/>
       <Route path="/app/analyst" element={<Guard><Analyst/></Guard>}/>
       <Route path="/app/canvas" element={<Guard><Canvas/></Guard>}/>
