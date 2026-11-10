@@ -1,0 +1,31 @@
+# Secrets and local state
+.env
+.env.*
+!.env.example
+backend/var/
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Vite
+node_modules/
+dist/
+frontend/dist/
+coverage/
+playwright-report/
+test-results/
+
+# Reference artwork downloaded for design analysis (third-party material)
+.design-refs/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/

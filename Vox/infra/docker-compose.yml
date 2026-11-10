@@ -1,0 +1,60 @@
+# Development infrastructure for VoxSafe.
+#
+# The application itself runs locally (see scripts/dev.sh) against these
+# services. This file deliberately does not pretend to be a production
+# deployment: no TLS terminator, no key management, no backups.
+#
+#   docker compose -f infra/docker-compose.yml up -d
+#   DATABASE_URL=postgresql+psycopg://voxsafe:voxsafe@127.0.0.1:5432/voxsafe \
+#   PYTHONPATH="backend:$PWD/ml:$PWD" backend/.venv/bin/uvicorn app.main:app --app-dir backend
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: voxsafe
+      POSTGRES_PASSWORD: voxsafe
+      POSTGRES_DB: voxsafe
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voxsafe -d voxsafe"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # Local stand-in for S3. Create the bucket once after start:
+  #   docker compose -f infra/docker-compose.yml exec minio \
+  #     mc alias set local http://127.0.0.1:9000 voxsafe voxsafe-minio && \
+  #     mc mb local/voxsafe-audio
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: voxsafe
+      MINIO_ROOT_PASSWORD: voxsafe-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:

@@ -1,0 +1,77 @@
+/*
+ * VoxSafe design tokens.
+ *
+ * Derived from direct inspection of the Clinexa Healthcare CRM dashboard
+ * (Dribbble shot 26892320), which is the sole visual authority for this
+ * product. Palette values were sampled from the reference artwork; the
+ * remaining token names map its observed layout, type and surface rules onto
+ * VoxSafe's domain. See docs/design-reference-analysis.md for the evidence.
+ */
+
+:root {
+  /* Canvas and surfaces ------------------------------------------------ */
+  --vs-canvas: #e9eef8; /* app backdrop, soft lavender-blue */
+  --vs-page: #f4f7fc; /* main content field */
+  --vs-surface: #ffffff; /* cards */
+  --vs-sunken: #eef2f9; /* segmented controls, wells */
+  --vs-sunken-strong: #e3e9f9; /* rail hover / muted blocks */
+
+  /* Strokes ------------------------------------------------------------ */
+  --vs-line: #e5ebf4;
+  --vs-line-strong: #d6dfec;
+
+  /* Ink ---------------------------------------------------------------- */
+  --vs-ink: #060607;
+  --vs-ink-2: #434f5f;
+  --vs-muted: #7c879b;
+  --vs-faint: #a6b0c2;
+
+  /* Primary ------------------------------------------------------------ */
+  --vs-primary: #4d5bad; /* active rail tile, primary actions */
+  --vs-primary-hover: #3f4c99;
+  --vs-primary-soft: #e7eaf9;
+  --vs-periwinkle: #8fa4e4;
+  --vs-lavender: #c3cafc;
+
+  /* Data accents ------------------------------------------------------- */
+  --vs-sage: #b4daaa;
+  --vs-sage-ink: #4f6b50;
+  --vs-teal: #78a3b2;
+  --vs-amber: #f8d29a;
+  --vs-clay: #c2564c; /* distress / locked states, used sparingly */
+  --vs-clay-soft: #f7e6e3;
+
+  /* Typography --------------------------------------------------------- */
+  --vs-font-sans: 'Instrument Sans Variable', Inter, system-ui, sans-serif;
+  --vs-text-page-title: 1.375rem; /* 22px, semibold, -0.01em */
+  --vs-text-section: 0.9375rem; /* 15px */
+  --vs-text-body: 0.875rem; /* 14px */
+  --vs-text-meta: 0.75rem; /* 12px */
+  --vs-text-label: 0.6875rem; /* 11px */
+
+  /* Shape -------------------------------------------------------------- */
+  --vs-radius-card: 18px;
+  --vs-radius-inner: 12px;
+  --vs-radius-field: 11px;
+  --vs-radius-pill: 999px;
+
+  /* Elevation ---------------------------------------------------------- */
+  --vs-shadow-card: 0 1px 2px rgba(6, 6, 7, 0.03),
+    0 14px 34px -26px rgba(67, 79, 95, 0.28);
+  --vs-shadow-raised: 0 2px 6px rgba(6, 6, 7, 0.05),
+    0 22px 48px -24px rgba(67, 79, 95, 0.32);
+
+  /* Spacing scale (4px base, matching the reference's 8/12/16/20 rhythm) */
+  --vs-space-1: 4px;
+  --vs-space-2: 8px;
+  --vs-space-3: 12px;
+  --vs-space-4: 16px;
+  --vs-space-5: 20px;
+  --vs-space-6: 24px;
+  --vs-space-8: 32px;
+  --vs-space-10: 40px;
+
+  --vs-rail-width: 76px;
+  --vs-header-height: 68px;
+  --vs-content-max: 1440px;
+}

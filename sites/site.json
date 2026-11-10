@@ -1,0 +1,15 @@
+{
+  "id": "3a2437b8-1cb4-45ff-84c0-adf8bbd0a3e6",
+  "name": "ResearchGraph",
+  "manifest": "sites/deploy.json",
+  "environments": {
+    "preview": {
+      "url": "https://site-942642bb18134977bde5709248101d00.freebuff.page",
+      "published": true
+    },
+    "production": {
+      "url": "https://site-1045fbbd43eb457db041979aeef79061.freebuff.page",
+      "published": false
+    }
+  }
+}

@@ -1,0 +1,52 @@
+version: pol-2026.11.1
+description: >-
+  VoxSafe baseline borrower-protection policy. Thresholds are starting points
+  from the build guide, not clinically or statistically calibrated production
+  values. Any change requires validation against consented, annotated data.
+notes: >-
+  Escalate-only evaluation: the resulting action is the maximum severity across
+  all rules that fire. Credibility is disabled and is review-only when enabled.
+rules:
+  - id: R1
+    description: Sustained distress (high arousal with negative valence over consecutive windows)
+    action: HANDOFF_IMMEDIATE
+    all_of:
+      - feature: arousal_ema
+        op: gte
+        value: 0.7
+      - feature: valence_ema
+        op: lte
+        value: -0.3
+      - feature: consecutive_high_arousal_windows
+        op: gte
+        value: 3
+  - id: R2
+    description: Classifier indicates a distressed vocal state
+    action: HANDOFF_IMMEDIATE
+    all_of:
+      - feature: p_distressed
+        op: gte
+        value: 0.6
+  - id: R3
+    description: Frustration watch (human review, not an automatic handoff)
+    action: REVIEW
+    all_of:
+      - feature: p_frustrated
+        op: gte
+        value: 0.65
+  - id: R4
+    description: Insufficient usable speech in the last 30 seconds (never treat as calm)
+    action: REVIEW
+    all_of:
+      - feature: speech_seconds_last_30s
+        op: lt
+        value: 8.0
+  - id: R5
+    description: Optional commitment-credibility review flag (disabled by default, review-only)
+    action: REVIEW
+    requires_feature: credibility
+    enabled: true
+    all_of:
+      - feature: cred_ema
+        op: lte
+        value: 0.3
