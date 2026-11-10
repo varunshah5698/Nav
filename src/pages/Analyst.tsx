@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useStore } from "../lib/store";
+import { navIcons } from "../components/icons";
 import {
   DEFAULT_SCOPE,
   analystStatus,
@@ -32,10 +33,10 @@ const SUGGESTIONS: { icon: string; title: string; body: string }[] = [
 ];
 
 const SCOPE_META = [
-  { key: "sources", label: "Sources", hint: "Papers, datasets, repos and abstracts", unit: "sources" },
-  { key: "graph", label: "Knowledge graph", hint: "Nodes, types and typed relations", unit: "nodes" },
-  { key: "runs", label: "Experiments", hint: "Plans, parameters and run metrics", unit: "runs" },
-  { key: "memory", label: "Memory", hint: "Errors, fixes and findings", unit: "records" },
+  { key: "sources", label: "Sources", hint: "Papers, datasets, repos and abstracts", unit: "sources", icon: "sources", tone: "orange" },
+  { key: "graph", label: "Knowledge graph", hint: "Nodes, types and typed relations", unit: "nodes", icon: "canvas", tone: "gold" },
+  { key: "runs", label: "Experiments", hint: "Plans, parameters and run metrics", unit: "runs", icon: "experiments", tone: "green" },
+  { key: "memory", label: "Memory", hint: "Errors, fixes and findings", unit: "records", icon: "memory", tone: "stone" },
 ] as const;
 
 function inline(text: string): React.ReactNode[] {
@@ -137,6 +138,13 @@ export default function Analyst() {
     () => buildAnalystContext({ ws, nodes, edges, sources, experiments, agents, memories }, scope),
     [ws, nodes, edges, sources, experiments, agents, memories, scope],
   );
+  const byScope = {
+    sources: context.counts.sources,
+    graph: context.counts.nodes,
+    runs: context.counts.runs,
+    memory: context.counts.memories,
+  };
+  const budgetPct = Math.min(100, Math.round((context.text.length / 14_000) * 100));
 
   useEffect(() => {
     setMessages(loadThread(activeWs));
@@ -271,40 +279,48 @@ export default function Analyst() {
             <i />
             {status === null ? "checking" : status.offline ? "service offline" : ready ? "key active" : "key missing"}
           </span>
-          <button className="btn btn-ghost btn-sm" onClick={newThread} disabled={!messages.length}>
+          <button className="an-new" onClick={newThread} disabled={!messages.length}>
+            <span aria-hidden>＋</span>
             New thread
           </button>
         </div>
       </header>
 
+      <section className="an-kpis" aria-label="Evidence in scope">
+        {SCOPE_META.map((meta) => {
+          const on = scope[meta.key];
+          return (
+            <article key={meta.key} className={`an-kpi t-${meta.tone}${on ? "" : " off"}`}>
+              <span className="an-kpi-label">{meta.label}</span>
+              <div className="an-kpi-row">
+                <b>{byScope[meta.key]}</b>
+                <span className="an-kpi-pill">{on ? "in scope" : "paused"}</span>
+              </div>
+              <span className="an-kpi-ic" aria-hidden>{navIcons[meta.icon]}</span>
+            </article>
+          );
+        })}
+      </section>
+
       <div className="an-grid">
         <aside className="an-rail">
-          <section className="an-brief">
-            <div className="an-brief-head">
-              <span>Briefing</span>
-              <b>{ws?.demo ? "demo" : "workspace"}</b>
+          <section className="an-profile">
+            <div className="an-profile-top">
+              <span className="an-orb">✦</span>
+              <div className="an-profile-id">
+                <b>Research Analyst</b>
+                <span>{ws?.name || "Workspace"}{ws?.demo ? " · demo" : ""}</span>
+              </div>
+              <span className={`an-profile-dot${ready ? " live" : ""}`} aria-hidden />
             </div>
-            <div className="an-brief-grid">
-              <div>
-                <b>{context.counts.sources}</b>
-                <span>sources</span>
-              </div>
-              <div>
-                <b>{context.counts.nodes}</b>
-                <span>nodes</span>
-              </div>
-              <div>
-                <b>{context.counts.runs}</b>
-                <span>runs</span>
-              </div>
-              <div>
-                <b>{context.counts.memories}</b>
-                <span>memory</span>
-              </div>
+            <div className="an-profile-rows">
+              <div><span>Model</span><b>{status?.model || "openai/gpt-oss-120b"}</b></div>
+              <div><span>Grounding</span><b>{context.items.length} citable items</b></div>
+              <div><span>Context</span><b>{context.tokens.toLocaleString("en-GB")} tokens</b></div>
+              <div><span>Thread</span><b>{turns} turn{turns === 1 ? "" : "s"}</b></div>
             </div>
-            <p className="an-brief-foot">
-              ≈ {context.tokens.toLocaleString("en-GB")} context tokens · {context.items.length} citable items
-            </p>
+            <div className="an-budget"><i style={{ width: `${budgetPct}%` }} /></div>
+            <div className="an-budget-foot"><span>Context window</span><b>{budgetPct}%</b></div>
           </section>
 
           <section className="an-card">
@@ -315,14 +331,6 @@ export default function Analyst() {
             <div className="an-scopes">
               {SCOPE_META.map((meta) => {
                 const on = scope[meta.key];
-                const n =
-                  meta.key === "sources"
-                    ? context.counts.sources
-                    : meta.key === "graph"
-                      ? context.counts.nodes
-                      : meta.key === "runs"
-                        ? context.counts.runs
-                        : context.counts.memories;
                 return (
                   <button
                     key={meta.key}
@@ -337,7 +345,7 @@ export default function Analyst() {
                       <em>{meta.hint}</em>
                     </span>
                     <span className="an-scope-n">
-                      {n} {meta.unit}
+                      {byScope[meta.key]} {meta.unit}
                     </span>
                     <span className="an-track">
                       <i />
@@ -358,8 +366,12 @@ export default function Analyst() {
             <div className="an-prompts">
               {SUGGESTIONS.map((s) => (
                 <button key={s.title} type="button" className="an-prompt" onClick={() => send(s.body)} disabled={busy}>
-                  <span>{s.icon}</span>
-                  {s.title}
+                  <span className="an-prompt-ic">{s.icon}</span>
+                  <span className="an-prompt-copy">
+                    <b>{s.title}</b>
+                    <em>{s.body}</em>
+                  </span>
+                  <span className="an-prompt-arrow" aria-hidden>↗</span>
                 </button>
               ))}
             </div>
@@ -393,7 +405,7 @@ export default function Analyst() {
                 <p>
                   {context.counts.sources === 0 && context.counts.nodes === 0
                     ? "This workspace is empty. Add a source or draw a node, then come back."
-                    : `${context.counts.sources} sources, ${context.counts.nodes} nodes and ${context.counts.runs} runs are in scope right now.`}
+                    : `${context.items.length} workspace ${context.items.length === 1 ? "item is" : "items are"} in scope right now.`}
                 </p>
                 <div className="an-tiles">
                   {SUGGESTIONS.map((s) => (
@@ -500,10 +512,7 @@ export default function Analyst() {
             </div>
             <div className="an-hint">
               <span>⌘↵ to send</span>
-              <span>
-                {context.counts.sources + context.counts.nodes + context.counts.runs + context.counts.memories} items in
-                scope · grounded answers only
-              </span>
+              <span>{context.items.length} items in scope · grounded answers only</span>
             </div>
           </form>
         </section>
