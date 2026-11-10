@@ -23,7 +23,7 @@
 }
 /* warm terracotta light behind the masthead */
 .an-page::before{
-  content:"";position:absolute;left:-26px;right:-26px;top:-12px;height:300px;z-index:0;pointer-events:none;
+  content:"";position:absolute;left:0;right:0;top:-12px;height:300px;z-index:0;pointer-events:none;
   background:radial-gradient(46% 86% at 5% 0%,rgba(243,112,63,.17),rgba(243,112,63,0) 62%);
   -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18%,rgba(0,0,0,.5) 58%,rgba(0,0,0,0) 94%);
   mask-image:linear-gradient(to bottom,transparent 0,#000 18%,rgba(0,0,0,.5) 58%,rgba(0,0,0,0) 94%);
@@ -370,10 +370,14 @@
   .an-page .an-head-right{padding-bottom:0}
 }
 @media (max-width:480px){
-  .an-page .an-kpis{grid-template-columns:1fr}
+  .an-page .an-kpis{grid-template-columns:1fr 1fr}
   .an-page .an-title{font-size:27px}
   .an-page .an-head{margin-top:12px}
-  .an-page .an-kpi-row b{font-size:28px}
+  .an-page .an-kpi{padding:13px}
+  .an-page .an-kpi-row b{font-size:26px}
+}
+@media (max-width:360px){
+  .an-page .an-kpis{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){
   .an-page .an-thinking i,.an-page .an-caret,.an-page .an-profile-dot.live{animation:none}
