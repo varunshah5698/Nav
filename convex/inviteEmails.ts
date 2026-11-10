@@ -136,7 +136,7 @@ export const send = action({
         }),
       });
       if (!response.ok) {
-        const detail = await response.text().catch(() => "");
+        const detail = (await response.text().catch(() => "")).replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, "[email]");
         // Never log the recipient or message body.
         console.error("[invite-email] Brevo rejected the message", response.status, detail.slice(0, 300));
         return { sent: false, configured: true as const, error: "The email provider rejected the message." };
