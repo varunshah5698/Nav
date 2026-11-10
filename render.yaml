@@ -3,6 +3,11 @@
 # Deploy: Render Dashboard → New → Blueprint → choose this repo → Apply.
 # Render creates a Static Site for the Vite build and a Python Web Service for
 # the FastAPI analyst API, then builds both from this file.
+#
+# Deploying the frontend as a plain Web Service instead? Build command
+# `npm install && npm run build`, start command `npm start` (server.mjs serves
+# the SPA and the analyst routes), and set only GROQ_API_KEY — no API service,
+# no VITE_API_URL, no CORS. See "Deploy (Render)" in README.md.
 
 services:
   # ---------------------------------------------------------------------------
