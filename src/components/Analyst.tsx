@@ -247,7 +247,7 @@ export default function AnalystDock() {
             <div className="adk-head-l">
               <span className="adk-mark" aria-hidden>✦</span>
               <div>
-                <b>Analyst</b>
+                <b>Research Analyst</b>
                 <span>{ws?.name || "Workspace"}</span>
               </div>
             </div>
@@ -278,7 +278,7 @@ export default function AnalystDock() {
               return (
                 <article key={m.id} className={`adk-msg${m.error ? " err" : ""}`}>
                   <div className="adk-msg-h">
-                    <i style={{ background: "var(--lime)" }} />
+                    <i style={{ background: "var(--adk-orange)" }} />
                     <b>Analyst</b>
                     <span>{m.offline ? "offline · computed" : m.latencyMs ? `${(m.latencyMs / 1000).toFixed(1)}s` : busy ? "thinking" : ""}</span>
                   </div>
