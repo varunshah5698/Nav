@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import ErrorBoundary from "../components/ErrorBoundary";
+const LabCore3D = lazy(() => import("../components/LabCore3D"));
 import { useStore } from "../lib/store";
 import { runExperimentSandbox } from "../lib/execution";
+import type { RunProgress } from "../lib/execution";
 import type { Experiment, ExpStatus } from "../lib/types";
 import "../styles/experiments.css";
 
@@ -98,12 +101,28 @@ function Icon({ name }: { name: "lab" | "run" | "target" | "gate" | "spark" }) {
 }
 
 /* ---------- 3d lab core ---------- */
-function LabCore({ best, runs, waiting }: { best: string; runs: number; waiting: number }) {
+function CoreRings() {
+  return (
+    <>
+      <span className="xh-orbit o1" />
+      <span className="xh-orbit o2" />
+      <span className="xh-orbit o3" />
+      <span className="xh-core-ball"><i /></span>
+    </>
+  );
+}
+
+function LabCore({ best, runs, waiting, live }: { best: string; runs: number; waiting: number; live: RunProgress | null }) {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const webgl = useMemo(() => {
+    try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch { return false; }
+  }, []);
+  const reduced = useMemo(() => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches, []);
   function move(e: React.PointerEvent<HTMLDivElement>) {
     const r = e.currentTarget.getBoundingClientRect();
     setTilt({ x: ((e.clientY - r.top) / r.height - 0.5) * -16, y: ((e.clientX - r.left) / r.width - 0.5) * 22 });
   }
+  const streaming = live?.stage === "epoch";
   return (
     <div
       className="xh-core-wrap"
@@ -112,14 +131,17 @@ function LabCore({ best, runs, waiting }: { best: string; runs: number; waiting:
       style={{ "--tx": `${tilt.x}deg`, "--ty": `${tilt.y}deg` } as CSSProperties}
       aria-hidden
     >
-      <div className="xh-core">
-        <span className="xh-orbit o1" />
-        <span className="xh-orbit o2" />
-        <span className="xh-orbit o3" />
-        <span className="xh-core-ball"><i /></span>
+      <div className={`xh-core ${webgl ? "is-3d" : "is-css"}`}>
+        {webgl ? (
+          <ErrorBoundary fallback={<CoreRings />}>
+            <Suspense fallback={<CoreRings />}>
+              <LabCore3D tiltX={tilt.x} tiltY={tilt.y} reduced={reduced} />
+            </Suspense>
+          </ErrorBoundary>
+        ) : <CoreRings />}
         <span className="xh-chip c1"><em>best</em>{best}</span>
         <span className="xh-chip c2">{runs} runs</span>
-        <span className="xh-chip c3">{waiting ? `${waiting} to approve` : "gate clear"}</span>
+        <span className="xh-chip c3">{streaming ? `epoch ${live.epoch}/${live.epochs}` : waiting ? `${waiting} to approve` : "gate clear"}</span>
       </div>
     </div>
   );
@@ -140,6 +162,7 @@ export default function Experiments() {
   const [sel, setSel] = useState<string | null>(null);
   const [wizard, setWizard] = useState(false);
   const [running, setRunning] = useState<string | null>(null);
+  const [live, setLive] = useState<RunProgress | null>(null);
   const [filter, setFilter] = useState<"all" | "pipeline" | "done">("all");
 
   const detail = exps.find(e => e.id === sel) || null;
@@ -162,20 +185,27 @@ export default function Experiments() {
 
   const run = async (e: Experiment) => {
     setRunning(e.id);
+    setLive(null);
     setSt(e.id, "running");
-    const res = await runExperimentSandbox(e.params);
-    addRun(e.id, {
-      id: "r-" + Date.now().toString(36),
-      startedAt: new Date(Date.now() - 60000).toISOString(),
-      finishedAt: new Date().toISOString(),
-      status: res.status,
-      metrics: res.metrics,
-      logs: res.logs,
-      params: e.params,
-    });
-    setSt(e.id, res.status);
-    setRunning(null);
-    toast(res.status === "completed" ? "Run finished — review the metrics." : "Run failed — logs saved.");
+    try {
+      const res = await runExperimentSandbox(e.params, undefined, 15000, { onProgress: setLive });
+      addRun(e.id, {
+        id: "r-" + Date.now().toString(36),
+        startedAt: new Date(Date.now() - 60000).toISOString(),
+        finishedAt: new Date().toISOString(),
+        status: res.status,
+        metrics: res.metrics,
+        logs: res.logs,
+        params: e.params,
+      });
+      setSt(e.id, res.status);
+      toast(res.status === "completed" ? "Run finished — review the metrics." : "Run failed — logs saved.");
+    } catch {
+      setSt(e.id, "failed");
+      toast("Run failed before metrics were captured.");
+    } finally {
+      setRunning(null);
+    }
   };
 
   return (
@@ -207,7 +237,7 @@ export default function Experiments() {
             <span><b>{Math.round(totalTime / 60)}</b> min compute</span>
           </div>
         </div>
-        <LabCore best={best ? pct(best.v) : "—"} runs={allRuns.length} waiting={waiting.length} />
+        <LabCore best={best ? pct(best.v) : "—"} runs={allRuns.length} waiting={waiting.length} live={live} />
       </motion.header>
 
       <section className="xh-kpis" aria-label="Experiment summary">
@@ -361,19 +391,24 @@ export default function Experiments() {
             </ol>
           </section>
 
-          <section className="xh-panel xh-telemetry">
-            <div className="xh-panel-h"><h2>Sandbox telemetry</h2><span className="xh-live"><i /> simulated</span></div>
+          <section className={`xh-panel xh-telemetry${running ? " is-live" : ""}`}>
+            <div className="xh-panel-h">
+              <h2>Run telemetry</h2>
+              <span className={running ? "xh-live" : ""}>{running ? <><i /> live</> : live ? "last run" : "idle"}</span>
+            </div>
             <div className="xh-eq" aria-hidden>
               {Array.from({ length: 30 }).map((_, i) => (
                 <i key={i} style={{ height: `${16 + ((i * 17) % 74)}%`, animationDelay: `${(i % 10) * 0.08}s` }} />
               ))}
             </div>
             <div className="xh-telemetry-meta">
-              <span><em>cpu</em><b>{running ? "92%" : "idle"}</b></span>
-              <span><em>mem</em><b>1.2 GB</b></span>
-              <span><em>timeout</em><b>15s</b></span>
+              <span><em>stage</em><b>{live ? (live.stage === "epoch" ? `epoch ${live.epoch}/${live.epochs}` : live.stage) : "waiting"}</b></span>
+              <span><em>accuracy</em><b>{live?.accuracy != null ? pct(live.accuracy) : "—"}</b></span>
+              <span><em>loss</em><b>{live?.loss != null ? live.loss.toFixed(3) : "—"}</b></span>
+              <span><em>elapsed</em><b>{live ? `${(live.elapsedMs / 1000).toFixed(1)}s` : "—"}</b></span>
             </div>
-            <p className="xh-note">Local CPU sandbox · logs captured. Colab and Docker runners are declared but not configured.</p>
+            <div className="xh-tele-progress" aria-hidden><i style={{ width: `${live ? (live.epoch / Math.max(1, live.epochs)) * 100 : 0}%` }} /></div>
+            <p className="xh-note">{running ? "Events stream from the sandbox as each epoch completes." : live ? "Last streamed run — start another to follow live epochs." : "Start an approved run to stream epoch telemetry."}</p>
           </section>
 
           <section className="xh-panel">

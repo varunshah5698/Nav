@@ -100,11 +100,15 @@
   position:relative;justify-self:end;width:330px;height:280px;perspective:1000px;
   --tx:0deg;--ty:0deg;
 }
-.xh-core{
-  position:absolute;inset:0;transform-style:preserve-3d;
+.xh-core{position:absolute;inset:0}
+.xh-core.is-css{
+  transform-style:preserve-3d;
   transform:rotateX(var(--tx)) rotateY(var(--ty));
   transition:transform .35s cubic-bezier(.2,.8,.2,1);
 }
+.xh-core.is-3d{transform:none}
+.xh-core3d{position:absolute;inset:0}
+.xh-core3d canvas{display:block;width:100%!important;height:100%!important;pointer-events:none}
 .xh-core::before{
   content:"";position:absolute;left:50%;top:54%;width:210px;height:210px;margin:-105px 0 0 -105px;border-radius:50%;
   background:radial-gradient(circle at 42% 36%,rgba(243,112,63,.24),rgba(243,112,63,0) 66%);
@@ -344,14 +348,17 @@
 .xh-live i{width:5px;height:5px;border-radius:50%;background:var(--xh-bad);animation:xhBlink 1.8s ease-in-out infinite}
 @keyframes xhBlink{0%,100%{opacity:1}50%{opacity:.25}}
 .xh-eq{display:flex;align-items:flex-end;gap:3px;height:58px;padding:8px 10px;background:#221810;border-radius:12px;overflow:hidden}
-.xh-eq i{flex:1;border-radius:2px 2px 0 0;background:linear-gradient(180deg,#FFB08E,var(--xh-orange));transform-origin:bottom;animation:xhEq 1.5s ease-in-out infinite alternate;opacity:.85}
+.xh-eq i{flex:1;border-radius:2px 2px 0 0;background:linear-gradient(180deg,#FFB08E,var(--xh-orange));transform-origin:bottom;animation:xhEq 1.5s ease-in-out infinite alternate;animation-play-state:paused;opacity:.55;transition:opacity .3s ease}
 .xh-eq i:nth-child(3n){background:linear-gradient(180deg,#E3F59B,var(--xh-lime-deep))}
 .xh-eq i:nth-child(4n){background:linear-gradient(180deg,#C9BDFF,var(--xh-violet))}
+.xh-telemetry.is-live .xh-eq i{animation-play-state:running;opacity:.95}
 @keyframes xhEq{from{transform:scaleY(.35)}to{transform:scaleY(1)}}
 .xh-telemetry-meta{display:flex;gap:14px;margin:10px 0 8px;flex-wrap:wrap}
 .xh-telemetry-meta span{display:flex;flex-direction:column;gap:1px}
 .xh-telemetry-meta em{font-style:normal;font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:#6E5C49}
 .xh-telemetry-meta b{font-family:var(--mono);font-size:10.5px;color:var(--xh-ink)}
+.xh-tele-progress{height:4px;border-radius:999px;background:rgba(64,44,28,.09);overflow:hidden;margin:2px 0 8px}
+.xh-tele-progress i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--xh-orange),var(--xh-lime-deep));transition:width .25s ease}
 
 .xh-recent{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
 .xh-recent button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;cursor:pointer;font-family:inherit;background:none;border:0;border-radius:9px;padding:7px 6px;transition:background .14s}
