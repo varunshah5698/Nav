@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { useStore } from "../lib/store";
+import AnalysisOrb from "./AnalysisOrb";
 import type { NodeType, RNode } from "../lib/types";
 
 /* mirrors the canvas palette so a node keeps one colour everywhere */
@@ -141,6 +142,7 @@ export default function NodeAnalysis({ nodeId, onClose }: { nodeId: string; onCl
   return <div className="na-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={`Full analysis of ${node.title}`}>
     <div className="na-sheet" onClick={e => e.stopPropagation()}>
       <header className="na-head">
+        <AnalysisOrb size={40} tone={color(t)} />
         <div>
           <span className="na-type" style={{ color: "#3B423F" }}><i style={{ background: color(t) }} />{pretty(t)}</span>
           <h2>{node.title}</h2>

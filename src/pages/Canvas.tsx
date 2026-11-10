@@ -11,6 +11,7 @@ import { useStore } from "../lib/store";
 import { Modal } from "../components/ui";
 import { Gauge } from "../components/Charts";
 import NodeAnalysis from "../components/NodeAnalysis";
+import AnalysisOrb from "../components/AnalysisOrb";
 import { graphMetrics } from "../lib/analytics";
 import type { EdgeType, NodeType, RNode, Activity } from "../lib/types";
 
@@ -32,13 +33,31 @@ const pretty = (t: string) => t.replace(/_/g, " ");
 /* ---------- node card ---------- */
 function NodeCard({ data }: { data: any }) {
   const n = data.node as RNode;
+  const degree = Number(data.degree || 0);
   return (
     <div className="cv-node" style={{ ["--c" as any]: C[n.type] }}>
       <Handle type="target" position={Position.Left} className="cv-handle" />
       <span className="cv-node-bar" />
       <div className="cv-node-meta">
         <span className="cv-node-type">{pretty(n.type)}</span>
-        <span className="cv-node-deg" title={`${data.degree} connections`}>{data.degree}</span>
+        <span className="cv-node-meta-r">
+          {degree > 0 && (
+            <button
+              type="button"
+              className="cv-node-orb"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                data.onAnalyze?.();
+              }}
+              aria-label={`Open full 3D graphical analysis for ${n.title}`}
+              title="Full 3D graphical analysis"
+            >
+              <AnalysisOrb size={18} tone={C[n.type]} />
+            </button>
+          )}
+          <span className="cv-node-deg" title={`${degree} connections`}>{degree}</span>
+        </span>
       </div>
       <div className="cv-node-title">{n.title}</div>
       {n.tags.length > 0 && (
@@ -73,8 +92,8 @@ const COLUMNS_NARROW: NodeType[][] = [
   ["code_file", "note", "question", "experiment"],
   ["result", "error", "fix", "conclusion"],
 ];
-const COL_W = 268, ORIGIN_X = 40, ORIGIN_Y = 40;
-const NW = 208, NH = 108;
+const COL_W = 330, ORIGIN_X = 60, ORIGIN_Y = 60;
+const NW = 236, NH = 132;
 const overlaps = (ns: RNode[]) => ns.some((a, i) => ns.some((b, j) => j > i && Math.abs(a.x - b.x) < NW && Math.abs(a.y - b.y) < NH));
 
 export default function Canvas() {
@@ -141,7 +160,11 @@ export default function Canvas() {
       const dim = !!focus && !focus.has(n.id);
       return {
         id: n.id, type: "rnode", position: { x: n.x, y: n.y },
-        data: { node: n, degree: degree.get(n.id) || 0 },
+        data: {
+          node: n,
+          degree: degree.get(n.id) || 0,
+          onAnalyze: () => { setSel(n.id); setAnalysisFor(n.id); },
+        },
         className: [dim ? "cv-dim" : "", sel === n.id ? "is-sel" : ""].join(" ").trim(),
         selected: sel === n.id,
         draggable: canEdit,
@@ -189,9 +212,9 @@ export default function Canvas() {
 
   const layout = useCallback(() => {
     const width = flowRef.current?.getBoundingClientRect().width || 900;
-    const narrow = width < 1180;
+    const narrow = width < 1500;
     const cols = narrow ? COLUMNS_NARROW : COLUMNS;
-    const rowH = narrow ? 96 : 138, colW = narrow ? 248 : COL_W;
+    const rowH = narrow ? 160 : 184, colW = narrow ? 300 : COL_W;
     cols.forEach((types, ci) => {
       const col = nodes.filter(n => types.includes(n.type)).sort((a, b) => a.y - b.y);
       col.forEach((n, ri) => upd(n.id, { x: ORIGIN_X + ci * colW, y: ORIGIN_Y + ri * rowH }));
@@ -205,7 +228,7 @@ export default function Canvas() {
     tidied.current = true;
     if (!canEdit) return;
     const box = flowRef.current?.getBoundingClientRect();
-    const mode = box && box.width < 1180 ? "compact" : "wide";
+    const mode = box && box.width < 1500 ? "compact" : "wide";
     if (localStorage.getItem("rg.canvas.layout.v2") === mode && !overlaps(nodes)) return;
     setTimeout(() => {
       layout();
@@ -458,7 +481,7 @@ export default function Canvas() {
                 </div>
 
                 <div className="cv-insp-acts">
-                  <button className="cv-btn lime" onClick={() => setAnalysisFor(node.id)}>Full analysis</button>
+                  <button className="cv-btn lime" onClick={() => setAnalysisFor(node.id)}><AnalysisOrb size={18} tone={C[node.type]} /> Full 3D analysis</button>
                   <button className="cv-btn ghost" onClick={() => setSuggFor(node.id)}>✦ Suggest</button>
                   <button className="cv-btn danger" disabled={!canEdit} onClick={() => { del(node.id); setSel(null); }}>Delete</button>
                 </div>
