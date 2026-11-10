@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ConvexAuthProvider } from '@convex-dev/auth/react'
 import './styles/global.css'
+import './styles/dark-app.css'
 import App from './App.tsx'
 import { convex } from './lib/convex.ts'
 
