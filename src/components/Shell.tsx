@@ -1,4 +1,4 @@
-import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useStore } from "../lib/store";
@@ -30,8 +30,6 @@ export default function Shell({children}:{children:React.ReactNode}){
   const pending=agents.filter(a=>a.status==="waiting_approval").length;
   const nav=useNavigate(); const [open,setOpen]=useState(false);
   const [q,setQ]=useState("");
-  const path=useLocation().pathname;
-  const dash=path.startsWith("/app/dashboard")||path.startsWith("/app/sources")||path.startsWith("/app/canvas");
   const initials=(user?.name||"R").split(/\s+/).map(p=>p[0]).slice(0,2).join("").toUpperCase();
   const closeMenu=()=>document.querySelector<HTMLDetailsElement>("details.rg-profile[open]")?.removeAttribute("open");
   const endSession=async()=>{ closeMenu(); await flushCloud(); await signOut(); nav("/login"); };
@@ -47,7 +45,7 @@ export default function Shell({children}:{children:React.ReactNode}){
     return ()=>{ document.removeEventListener("pointerdown",onDown); document.removeEventListener("keydown",onKey); };
   },[]);
 
-  return <div className={`rg-shell${dash?" theme-dash":""}`}>
+  return <div className="rg-shell theme-dash">
     <a className="skip" href="#main">Skip to content</a>
     <aside className="rg-side">
       <Link to="/app/dashboard" className="rg-brand" aria-label="ResearchGraph home">

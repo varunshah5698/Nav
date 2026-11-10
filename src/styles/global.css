@@ -150,8 +150,18 @@ label.lbl{font-size:12px;font-weight:700;color:var(--muted);display:block;margin
 .rf-node{border-radius:14px;border:1.5px solid var(--line);background:#fff;padding:10px 12px;min-width:180px;max-width:230px;box-shadow:var(--shadow-card);font-size:12px}
 .rf-node.sel{border-color:var(--violet-deep);box-shadow:0 0 0 3px rgba(156,139,229,.3)}
 .rf-node h4{margin:0 0 3px;font-size:12.5px}
-/* ---------- Dashboard chrome theme ---------- */
-.theme-dash{background:
+/* ---------- Dark app theme ---------- */
+.theme-dash{
+  --ink:#F4F1EC;--ink-2:#EDEAE2;--ink-3:#D8D3CC;
+  --text:#EDEAE2;--muted:#A8A39C;--muted-2:#8F8A83;
+  --paper:#1B1A18;--paper-2:#201F1D;--card:#232220;
+  --line:rgba(255,255,255,.08);--line-soft:rgba(255,255,255,.055);
+  --good:#82E78F;--good-bg:rgba(130,231,143,.14);
+  --warn:#F2B64B;--warn-bg:rgba(242,182,75,.14);
+  --bad:#FF937A;--bad-bg:rgba(255,147,122,.14);
+  --shadow-card:0 1px 2px rgba(0,0,0,.18),0 12px 30px -18px rgba(0,0,0,.55);
+  --shadow-pop:0 20px 50px -20px rgba(0,0,0,.85);
+  background:
   radial-gradient(900px 480px at 82% -6%,rgba(240,150,110,.22),rgba(240,150,110,0) 62%),
   radial-gradient(760px 460px at 8% 12%,rgba(160,178,156,.14),rgba(160,178,156,0) 64%),
   radial-gradient(1000px 600px at 50% 110%,rgba(111,208,140,.08),rgba(111,208,140,0) 60%),
@@ -267,3 +277,34 @@ label.lbl{font-size:12px;font-weight:700;color:var(--muted);display:block;margin
   animation: rg-boot-rot 0.8s linear infinite;
 }
 @keyframes rg-boot-rot { to { transform: rotate(360deg); } }
+
+/* ---------- shared dark app surfaces ---------- */
+.theme-dash .btn-primary{background:#F3703F;color:#2A130B}
+.theme-dash .btn-primary:hover{background:#FF8152}
+.theme-dash .btn-ghost{background:rgba(255,255,255,.06);border-color:var(--line);color:var(--ink)}
+.theme-dash .btn-ghost:hover{background:rgba(255,255,255,.10)}
+.theme-dash .btn-lime{background:var(--lime);color:#1E2222}
+.theme-dash .btn-lime:hover{background:var(--lime-deep)}
+.theme-dash .input,.theme-dash .select,.theme-dash .textarea{background:rgba(255,255,255,.045);border-color:var(--line);color:var(--ink)}
+.theme-dash .input:focus,.theme-dash .select:focus,.theme-dash .textarea:focus{background:rgba(255,255,255,.06);border-color:#F3703F;box-shadow:0 0 0 3px rgba(243,112,63,.14)}
+.theme-dash .modal{background:#232220;border:1px solid var(--line);color:var(--ink);box-shadow:var(--shadow-pop)}
+.theme-dash .drawer{background:#232220;border-color:var(--line);color:var(--ink)}
+.theme-dash .overlay{background:rgba(8,7,6,.62)}
+.theme-dash .toast{background:#2E2C29;color:var(--ink);border:1px solid var(--line)}
+.theme-dash .empty{background:rgba(255,255,255,.025);border-color:var(--line);color:var(--muted)}
+.theme-dash .empty b{color:var(--ink)}
+.theme-dash .card-h .ticon{background:rgba(255,255,255,.07)}
+.theme-dash .tabs{background:rgba(255,255,255,.06)}
+.theme-dash .tabs button.active{background:#2E2C29;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.theme-dash .chip{background:rgba(255,255,255,.055);border-color:var(--line);color:var(--muted)}
+.theme-dash .chip.active{background:var(--lime);color:#1E2222;border-color:var(--lime)}
+.theme-dash .tbl tr:hover td{background:rgba(255,255,255,.035)}
+.theme-dash .badge{background:rgba(255,255,255,.07);color:#D8D3CC}
+.theme-dash .badge.dark{background:rgba(255,255,255,.14);color:var(--ink)}
+.theme-dash .badge.lime{background:var(--lime);color:#1E2222}
+.theme-dash .badge.yellow{background:rgba(242,182,75,.16);color:var(--warn)}
+.theme-dash .badge.violet{background:rgba(156,139,229,.18);color:#C9BDFF}
+.theme-dash .progress{background:rgba(255,255,255,.08)}
+.theme-dash .menubtn{background:rgba(255,255,255,.07);border-color:var(--line)}
+.theme-dash .menubtn svg{color:var(--ink)}
+.theme-dash .skip:focus{background:#232220;color:var(--ink)}
