@@ -47,6 +47,7 @@ export default function App(){
       <Route path="/" element={<Landing/>}/>
       <Route path="/login" element={<Login/>}/>
       <Route path="/register" element={<Register/>}/>
+      <Route path="/signup" element={<Register/>}/>
       <Route path="/app/dashboard" element={<Guard><Dashboard/></Guard>}/>
       <Route path="/app/analyst" element={<Guard><Analyst/></Guard>}/>
       <Route path="/app/canvas" element={<Guard><Canvas/></Guard>}/>

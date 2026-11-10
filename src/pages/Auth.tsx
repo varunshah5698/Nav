@@ -166,7 +166,7 @@ function useRedirectIfSignedIn() {
   }, [isLoading, isAuthenticated, nav]);
 }
 
-function GoogleForm() {
+function GoogleForm({ cta, foot }: { cta: string; foot: ReactNode }) {
   const { signIn } = useAuthActions();
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -188,7 +188,7 @@ function GoogleForm() {
       {err && <Alert>{err}</Alert>}
       <button className="auth-google" type="button" onClick={go} disabled={busy}>
         {busy ? <span className="auth-spin auth-spin-dark" aria-hidden="true" /> : <GoogleMark />}
-        <span>{busy ? "Opening Google…" : "Continue with Google"}</span>
+        <span>{busy ? "Opening Google…" : cta}</span>
         {!busy && <ArrowIcon />}
       </button>
 
@@ -199,8 +199,10 @@ function GoogleForm() {
       </ul>
 
       <p className="auth-foot">
-        Only your name, email and profile photo are stored. A labelled demo workspace is seeded on first sign-in.
+        Only your name, email and profile photo are stored. Your workspace, graph and sources are saved to
+        Convex and restored every time you sign in with this Google account.
       </p>
+      <p className="auth-foot">{foot}</p>
     </>
   );
 }
@@ -214,7 +216,10 @@ export function Login() {
       title="Welcome back"
       sub={<>Sign in to open <b>your research workspace</b>.</>}
     >
-      <GoogleForm />
+      <GoogleForm
+        cta="Sign in with Google"
+        foot={<>New here? <Link to="/register">Create an account</Link></>}
+      />
     </Frame>
   );
 }
@@ -225,10 +230,13 @@ export function Register() {
   return (
     <Frame
       mode="register"
-      title="Create your workspace"
-      sub={<>One click with Google — <b>no new password</b> to remember.</>}
+      title="Create your account"
+      sub={<>First time? <b>Sign up with Google</b> — no new password to remember.</>}
     >
-      <GoogleForm />
+      <GoogleForm
+        cta="Sign up with Google"
+        foot={<>Already have an account? <Link to="/login">Sign in</Link></>}
+      />
     </Frame>
   );
 }
