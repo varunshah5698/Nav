@@ -9,6 +9,8 @@ npm run dev      # → http://localhost:5173
 ```
 Register (any email) → demo workspace seeds automatically. Login persists locally.
 
+**Live:** <https://researchgraph-steel.vercel.app> — static Vite build on Vercel with the analyst endpoint in `api/`. The AI Analyst reports offline until `GROQ_API_KEY` is set in the Vercel project.
+
 ## What works now (all real, no dead buttons)
 - **AI Analyst**: Groq-backed analyst grounded in sources, graph, experiment runs and memory — scope switches, streamed answers, per-item citations; the key stays server-side behind `/api/analyst`.
 - **Canvas**: 12 node types, typed edges, drag/persist/search/filter/auto-layout/inspector/undo, AI link suggestions with evidence + Accept/Reject.
