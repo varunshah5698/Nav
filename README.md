@@ -22,19 +22,27 @@ Register (any email) → demo workspace seeds automatically. Login persists loca
 - **Collab**: owner/editor/viewer (enforced), access roster with local-only invites, workspace activity, export studio (Report MD, BibTeX, Graph JSON, Exp CSV) with live preview, size/line count and export history. Report sections and sources are selectable; every file is generated in the browser.
 - **Dashboard**: real KPIs + activity/distribution/outcome/agent/graph panels, range filter, empty states, no fabricated deltas.
 
-## Authentication & cloud sync (Convex Auth + Google)
+## Authentication & cloud sync (Convex Auth)
 
 Convex is the authentication authority and the cloud store. There is no local
 account system: `users`/password hashes were removed, and the store only mirrors
 the identity returned by `ctx.auth.getUserIdentity()`.
 
+Two providers, both permanent Convex accounts:
+
+- **Email + password** (`Password` provider, Scrypt hashing, 8+ chars) —
+  `/login` signs in, `/register` (or `/signup`) creates the account with a
+  confirm-password check.
+- **Google OAuth** — always offered under the “or” divider on both pages.
+  First authorization creates the account; later ones resume it.
+
 ```
-Google OAuth -> convex.site/api/auth/callback/google -> Convex Auth session
+email/password or Google -> Convex Auth session
    -> useConvexAuth()/users.me -> store.startSession(server identity)
    -> snapshots.get/save (ownership from getAuthUserId, never from the client)
 ```
 
-- `convex/auth.ts` — Google provider (`@auth/core`).
+- `convex/auth.ts` — `Password` + Google (`@auth/core`) providers.
 - `convex/http.ts` — `/api/auth/*` HTTP routes.
 - `convex/schema.ts` — `authTables` + `userSnapshots` (one per Convex user) +
   legacy `snapshots` (kept read-only; never exposed by a function).
@@ -76,6 +84,14 @@ VITE_CONVEX_URL=https://canny-echidna-518.convex.cloud
 
 `npx convex deploy` pushes schema + functions. Documents are capped at 1 MiB;
 the client skips snapshots over ~900 KB with a console warning.
+
+### Known limits
+
+- Password reset is not configured (needs an email provider such as Resend).
+  A forgotten password currently requires recreating the account under a new
+  email. Add `Password({ reset })` before using real accounts.
+- Google and password accounts are separate even with the same email; account
+  linking is not enabled.
 
 ### Data migration
 

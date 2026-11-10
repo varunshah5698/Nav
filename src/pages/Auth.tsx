@@ -4,8 +4,7 @@ import ErrorBoundary from "../components/ErrorBoundary";
 import { LogoMark } from "../components/Logo";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { useAuthActions } from "@convex-dev/auth/react";
-import { useConvexAuth } from "@convex-dev/auth/react";
+import { useAuthActions, useConvexAuth } from "@convex-dev/auth/react";
 import "../styles/auth.css";
 
 const Universe = lazy(() => import("../components/AuthScene"));
@@ -25,6 +24,26 @@ function StaticOrb() {
 }
 
 /* ---------- icons ---------- */
+const MailIcon = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="2.5" y="4.5" width="19" height="15" rx="3" />
+    <path d="m3 7 9 6 9-6" />
+  </svg>
+);
+const LockIcon = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="4" y="10" width="16" height="11" rx="3" />
+    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    <circle cx="12" cy="15.5" r="1.2" />
+  </svg>
+);
+const EyeIcon = ({ off }: { off: boolean }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" />
+    <circle cx="12" cy="12" r="2.8" />
+    {off && <path d="M4 20 20 4" />}
+  </svg>
+);
 const ArrowIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M5 12h13M13 6l6 6-6 6" />
@@ -134,7 +153,7 @@ function Frame({ mode, title, sub, children }: { mode: Mode; title: string; sub:
               {children}
             </div>
             <p className="auth-legal">
-              Sessions secured by Convex Auth · Google OAuth 2.0
+              Sessions secured by Convex Auth · email/password + Google OAuth 2.0
             </p>
           </motion.section>
         </div>
@@ -157,7 +176,7 @@ function Alert({ children }: { children: ReactNode }) {
   );
 }
 
-/* ---------- google auth ---------- */
+/* ---------- auth plumbing ---------- */
 function useRedirectIfSignedIn() {
   const nav = useNavigate();
   const { isLoading, isAuthenticated } = useConvexAuth();
@@ -166,7 +185,124 @@ function useRedirectIfSignedIn() {
   }, [isLoading, isAuthenticated, nav]);
 }
 
-function GoogleForm({ cta, foot }: { cta: string; foot: ReactNode }) {
+function authErrorMessage(e: unknown, register: boolean) {
+  const data = (e as { data?: unknown })?.data;
+  const code = typeof data === "string" ? data : (data as { code?: string } | undefined)?.code ?? "";
+  const msg = e instanceof Error ? e.message : typeof data === "string" ? data : "";
+  if (code === "TooManyFailedAttempts" || /too many/i.test(msg)) {
+    return "Too many attempts. Wait a few minutes and try again.";
+  }
+  if (/already exists/i.test(msg)) return "An account with this email already exists. Sign in instead.";
+  if (/at least 8|too short|invalid password/i.test(msg)) return "Password must be at least 8 characters.";
+  return register
+    ? "Could not create the account. If you already signed up, use Sign in."
+    : "Email or password is incorrect.";
+}
+
+/* ---------- email + password ---------- */
+function PasswordForm({ mode }: { mode: Mode }) {
+  const { signIn } = useAuthActions();
+  const nav = useNavigate();
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [show, setShow] = useState(false);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const register = mode === "register";
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setErr("");
+    const mail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) return setErr("Enter a valid email address.");
+    if (pass.length < 8) return setErr("Password must be at least 8 characters.");
+    if (register && pass !== confirm) return setErr("Passwords do not match.");
+
+    setBusy(true);
+    try {
+      await signIn("password", { email: mail, password: pass, flow: register ? "signUp" : "signIn" });
+      nav("/app/dashboard", { replace: true });
+    } catch (e) {
+      setErr(authErrorMessage(e, register));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} noValidate>
+      {err && <Alert>{err}</Alert>}
+
+      <label className="auth-label" htmlFor="auth-email">Email</label>
+      <div className="auth-field">
+        <span className="fi"><MailIcon /></span>
+        <input
+          id="auth-email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+          placeholder="you@lab.edu"
+          autoFocus
+        />
+      </div>
+
+      <div className="auth-gap" />
+
+      <label className="auth-label" htmlFor="auth-pass">
+        Password <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>(8+ chars)</span>
+      </label>
+      <div className="auth-field">
+        <span className="fi"><LockIcon /></span>
+        <input
+          id="auth-pass"
+          type={show ? "text" : "password"}
+          value={pass}
+          onChange={(e) => setPass(e.target.value)}
+          autoComplete={register ? "new-password" : "current-password"}
+          placeholder="••••••••"
+        />
+        <button
+          type="button"
+          className="auth-eye"
+          onClick={() => setShow(!show)}
+          aria-label={show ? "Hide password" : "Show password"}
+          aria-pressed={show}
+        >
+          <EyeIcon off={show} />
+        </button>
+      </div>
+
+      {register && (
+        <>
+          <div className="auth-gap" />
+          <label className="auth-label" htmlFor="auth-confirm">Confirm password</label>
+          <div className="auth-field">
+            <span className="fi"><LockIcon /></span>
+            <input
+              id="auth-confirm"
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              autoComplete="new-password"
+              placeholder="Repeat password"
+            />
+          </div>
+        </>
+      )}
+
+      <button className="auth-submit" type="submit" disabled={busy}>
+        {busy
+          ? <><span className="auth-spin" /> {register ? "Creating account" : "Signing in"}</>
+          : <>{register ? "Create account" : "Sign in"} <ArrowIcon /></>}
+      </button>
+    </form>
+  );
+}
+
+/* ---------- google ---------- */
+function GoogleButton({ mode }: { mode: Mode }) {
   const { signIn } = useAuthActions();
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -178,7 +314,7 @@ function GoogleForm({ cta, foot }: { cta: string; foot: ReactNode }) {
     try {
       await signIn("google", { redirectTo: "/app/dashboard" });
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Google sign-in failed. Please try again.");
+      setErr(authErrorMessage(e, mode === "register"));
       setBusy(false);
     }
   }
@@ -188,55 +324,46 @@ function GoogleForm({ cta, foot }: { cta: string; foot: ReactNode }) {
       {err && <Alert>{err}</Alert>}
       <button className="auth-google" type="button" onClick={go} disabled={busy}>
         {busy ? <span className="auth-spin auth-spin-dark" aria-hidden="true" /> : <GoogleMark />}
-        <span>{busy ? "Opening Google…" : cta}</span>
+        <span>{busy ? "Opening Google…" : mode === "register" ? "Sign up with Google" : "Sign in with Google"}</span>
         {!busy && <ArrowIcon />}
       </button>
-
-      <ul className="auth-assure">
-        <li>Verified by Google — ResearchGraph never sees your password.</li>
-        <li>Your workspace is private to your Google account.</li>
-        <li>Sessions refresh automatically; sign out from the account menu.</li>
-      </ul>
-
-      <p className="auth-foot">
-        Only your name, email and profile photo are stored. Your workspace, graph and sources are saved to
-        Convex and restored every time you sign in with this Google account.
-      </p>
-      <p className="auth-foot">{foot}</p>
     </>
   );
 }
 
-/* ---------- login ---------- */
+function AuthOptions({ mode }: { mode: Mode }) {
+  return (
+    <>
+      <PasswordForm mode={mode} />
+      <div className="auth-div">or</div>
+      <GoogleButton mode={mode} />
+      <p className="auth-foot">
+        {mode === "register"
+          ? <>Already have an account? <Link to="/login">Sign in</Link></>
+          : <>New here? <Link to="/register">Create an account</Link></>}
+      </p>
+      <p className="auth-foot">
+        Your workspace, graph and sources are saved to Convex and restored every time you sign in.
+      </p>
+    </>
+  );
+}
+
+/* ---------- pages ---------- */
 export function Login() {
   useRedirectIfSignedIn();
   return (
-    <Frame
-      mode="login"
-      title="Welcome back"
-      sub={<>Sign in to open <b>your research workspace</b>.</>}
-    >
-      <GoogleForm
-        cta="Sign in with Google"
-        foot={<>New here? <Link to="/register">Create an account</Link></>}
-      />
+    <Frame mode="login" title="Welcome back" sub={<>Sign in to open <b>your research workspace</b>.</>}>
+      <AuthOptions mode="login" />
     </Frame>
   );
 }
 
-/* ---------- register ---------- */
 export function Register() {
   useRedirectIfSignedIn();
   return (
-    <Frame
-      mode="register"
-      title="Create your account"
-      sub={<>First time? <b>Sign up with Google</b> — no new password to remember.</>}
-    >
-      <GoogleForm
-        cta="Sign up with Google"
-        foot={<>Already have an account? <Link to="/login">Sign in</Link></>}
-      />
+    <Frame mode="register" title="Create your account" sub={<>Email and password, or <b>continue with Google</b>.</>}>
+      <AuthOptions mode="register" />
     </Frame>
   );
 }

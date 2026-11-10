@@ -104,6 +104,13 @@ export function useCloudSync() {
       timer = setTimeout(() => void flush(), 800);
     });
 
+    // The first seed can land in the same commit as this effect; persist it
+    // even if no later mutation triggers the subscription.
+    const current = useStore.getState();
+    if (current.cloudReady && current.sessionUserId === me.id) {
+      timer = setTimeout(() => void flush(), 300);
+    }
+
     const onHide = () => { if (document.visibilityState === "hidden") flush(); };
     const flushBound = () => void flush();
     document.addEventListener("visibilitychange", onHide);
