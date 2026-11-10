@@ -21,7 +21,7 @@ Register with Google → demo workspace seeds automatically. Google-only account
 - **Experiments**: wizard → plan approval gate → isolated CPU sandbox (timeout, logs) → run comparison → save to memory. Colab = honest stub.
 - **Memory**: 9 kinds, error→fix linking, reuse counts, draft-experiment recommendations.
 - **Discovery**: hybrid TF-IDF + keyword + filters, excerpts with highlights, search analytics (volume/engagement/zero-result).
-- **Collab**: owner/editor/viewer (enforced), access roster with local-only invites, workspace activity, export studio (Report MD, BibTeX, Graph JSON, Exp CSV) with live preview, size/line count and export history. Report sections and sources are selectable; every file is generated in the browser.
+- **Collab**: owner/editor/viewer (enforced), access roster with Brevo-backed invite email (and a mailto fallback when email is not configured), workspace activity, persistent handoff files in Convex file storage, ZIP bundles (selected export + attachments + manifest), and an export studio (Report MD, BibTeX, Graph JSON, Exp CSV) with live preview, size/line count and export history. Report sections and sources are selectable; every export is generated in the browser.
 - **Dashboard**: real KPIs + activity/distribution/outcome/agent/graph panels, range filter, empty states, no fabricated deltas.
 
 ## Authentication & cloud sync (Convex Auth)
@@ -84,6 +84,18 @@ npx convex env set BREVO_SENDER_NAME ResearchGraph
 
 `BREVO_API_KEY` and the sender settings live only in the Convex deployment
 environment — never in `.env.local`, never in a `VITE_` variable, never in git.
+
+The same sender powers workspace invitation emails from the Share page. When
+the Brevo variables are absent, the invite is still recorded and the page offers
+a `mailto:` fallback instead of pretending it sent. Invite sending is limited to
+20 messages per authenticated user per hour.
+
+Handoff attachments are stored in Convex file storage: bytes live in built-in
+storage and metadata lives in the `attachments` table, so files survive refresh
+and are available on another device. They are not part of the 1 MiB snapshot.
+Limits are enforced server-side: 20 MB per file, 60 MB and 100 files per
+workspace. `npx convex deploy` is required after changing these functions or the
+schema.
 
 Deploy the schema/functions with `npx convex deploy`, set `SITE_URL` on the
 Convex deployment to the public app origin (for the Render service:
