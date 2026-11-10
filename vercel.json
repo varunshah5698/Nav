@@ -1,6 +1,13 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "redirects": [
+    {
+      "source": "/horizon-homes",
+      "destination": "/horizon-homes/",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/app/:path*",
@@ -13,10 +20,6 @@
     {
       "source": "/register",
       "destination": "/index.html"
-    },
-    {
-      "source": "/horizon-homes",
-      "destination": "/horizon-homes/index.html"
     }
   ]
 }
