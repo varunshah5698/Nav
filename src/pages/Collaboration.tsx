@@ -8,6 +8,7 @@ import { Donut } from "../components/Charts";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Membership } from "../lib/types";
+import { serializeWorkspace } from "../lib/sharedWorkspace";
 import {
   bibtex,
   bytesOf,
@@ -125,6 +126,7 @@ interface MailState {
   tone: "ok" | "warn" | "err";
   text: string;
   mailto?: string;
+  link?: string;
 }
 
 const extOf = (name: string) => name.split(".").pop()?.toLowerCase() || "";
@@ -315,8 +317,6 @@ export default function Collaboration() {
   const mems = useMemo(() => _mems.filter((n) => n.workspaceId === activeWs), [_mems, activeWs]);
   const _acts = useStore((s) => s.activities);
   const acts = useMemo(() => _acts.filter((n) => n.workspaceId === activeWs).slice(0, 14), [_acts, activeWs]);
-  const _invites = useStore((s) => s.invites);
-  const invites = useMemo(() => _invites.filter((n) => n.workspaceId === activeWs), [_invites, activeWs]);
   const _exports = useStore((s) => s.exports);
   const exportsLog = useMemo(() => _exports.filter((n) => n.workspaceId === activeWs), [_exports, activeWs]);
   const _members = useStore((s) => s.memberships);
@@ -327,8 +327,8 @@ export default function Collaboration() {
       .sort((a, b) => (order[a.role] ?? 3) - (order[b.role] ?? 3));
   }, [_members, activeWs]);
 
-  const invite = useStore((s) => s.invite);
   const setRole = useStore((s) => s.setRole);
+  const promoteDemoWorkspace = useStore((s) => s.promoteDemoWorkspace);
   const addExport = useStore((s) => s.addExport);
   const canManage = useStore((s) => s.isOwner);
 
@@ -336,15 +336,24 @@ export default function Collaboration() {
   const registerAttachment = useMutation(api.attachments.register);
   const removeAttachment = useMutation(api.attachments.remove);
   const clearAttachments = useMutation(api.attachments.clear);
-  const sendInviteEmail = useAction(api.inviteEmails.send);
+  const reassignAttachments = useMutation(api.attachments.reassign);
+  const ensureWorkspace = useMutation(api.workspaceSync.ensure);
+  const setMemberRole = useMutation(api.workspaceSync.setRole);
+  const createInvite = useAction(api.workspaceInvites.createAndSend);
+  const revokeInvite = useMutation(api.workspaceInvites.revoke);
   const attachmentRows = useQuery(
     api.attachments.list,
+    activeWs ? { workspaceId: activeWs } : "skip",
+  );
+  const serverInvites = useQuery(
+    api.workspaceInvites.list,
     activeWs ? { workspaceId: activeWs } : "skip",
   );
   const attachments = useMemo(() => attachmentRows ?? [], [attachmentRows]);
 
   const owner = canManage();
   const myRole = members.find((m) => m.userId === sessionUserId)?.role;
+  const canAttach = owner || myRole === "editor";
   const me = users.find((u) => u.id === sessionUserId);
 
   const [format, setFormat] = useState<Format>("md");
@@ -363,7 +372,7 @@ export default function Collaboration() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const runCount = useMemo(() => exps.reduce((a, e) => a + e.runs.length, 0), [exps]);
-  const pending = invites.filter((i) => i.status === "pending");
+  const pending = serverInvites ?? [];
   const totalUploadBytes = useMemo(() => attachments.reduce((a, f) => a + f.size, 0), [attachments]);
   const pendingBytes = useMemo(() => pendingUploads.reduce((a, f) => a + f.file.size, 0), [pendingUploads]);
   const shownAttachments = useMemo(() => {
@@ -376,7 +385,7 @@ export default function Collaboration() {
   }, [pendingUploads, fileQuery]);
   const filesLoading = attachmentRows === undefined;
   const reportFiles = useMemo(
-    () => attachments.map((f) => ({ name: f.name, ext: f.ext, bytes: f.size })),
+    () => attachments.map((f) => ({ name: f.name, ext: f.ext, bytes: f.size, uploader: f.uploaderName ?? undefined })),
     [attachments],
   );
 
@@ -496,21 +505,35 @@ export default function Collaboration() {
   };
 
   const origin = window.location.origin;
-  const inviteNote = [
-    `${me?.name || "A researcher"} invited you to “${ws?.name || "a workspace"}” on ResearchGraph.`,
-    note.trim() ? `“${note.trim()}”` : "",
-    `Sign in at ${origin}/login with this email address — the owner can add you to the roster under Share.`,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
 
   const toggleSection = (id: ReportSection) => {
     setSections((cur) => (cur.includes(id) ? (cur.length > 1 ? cur.filter((x) => x !== id) : cur) : [...cur, id]));
   };
 
-  const mailtoFor = (to: string) => {
+  const mailtoFor = (to: string, link: string) => {
     const subject = `${me?.name || "A researcher"} invited you to ${ws?.name || "a workspace"} on ResearchGraph`;
-    return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(inviteNote)}`;
+    const body = [
+      `${me?.name || "A researcher"} invited you to “${ws?.name || "a workspace"}” on ResearchGraph.`,
+      note.trim() ? `“${note.trim()}”` : "",
+      `Accept the invitation: ${link}`,
+      `This link is single-use and expires in 7 days.`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const ensureSharedWorkspace = async (workspaceId: string) => {
+    const current = useStore.getState().workspaces.find((w) => w.id === workspaceId);
+    if (!current) throw new Error("Workspace not found");
+    await ensureWorkspace({
+      workspaceId: current.id,
+      name: current.name,
+      description: current.description,
+      createdAt: current.createdAt,
+      payload: serializeWorkspace(current.id),
+    });
+    return current;
   };
 
   const submitInvite = async (e: FormEvent) => {
@@ -532,47 +555,96 @@ export default function Collaboration() {
       toast("That person is already in the workspace.");
       return;
     }
-    invite(to, role);
-    setEmail("");
     setSendingInvite(true);
     setMailState(null);
     try {
-      const result = await sendInviteEmail({
+      let target = useStore.getState().workspaces.find((w) => w.id === activeWs);
+      if (!target) throw new Error("Workspace not found");
+      if (target.demo) {
+        const oldId = target.id;
+        const newId = promoteDemoWorkspace(oldId);
+        target = await ensureSharedWorkspace(newId);
+        try {
+          await reassignAttachments({ from: oldId, to: newId });
+        } catch {
+          /* demo attachments can be re-added if the move fails */
+        }
+        toast("This demo workspace is now shared.");
+      } else {
+        target = await ensureSharedWorkspace(target.id);
+      }
+
+      const result = await createInvite({
+        workspaceId: target.id,
         to,
-        workspaceName: ws?.name || "a workspace",
-        inviterName: me?.name || "A researcher",
         role,
         note: note.trim() || undefined,
-        link: `${origin}/login`,
+        origin,
       });
+      setEmail("");
       if (result.sent) {
-        setMailState({ tone: "ok", text: `Invitation emailed to ${to}.` });
+        setMailState({
+          tone: "ok",
+          text: `Invitation emailed to ${to}. The link is single-use and expires in 7 days.`,
+          link: result.link,
+        });
         toast(`Invitation emailed to ${to}`);
       } else if (!result.configured) {
         setMailState({
           tone: "warn",
-          text: "Invitation recorded, but email delivery is not configured on this deployment. Send it from your mail app or copy the invite.",
-          mailto: mailtoFor(to),
+          text: "Invitation created, but email delivery is not configured on this deployment. Copy the unique invite link or send it from your mail app.",
+          mailto: mailtoFor(to, result.link),
+          link: result.link,
         });
-        toast("Invite saved — use your mail app to deliver it.");
+        toast("Invitation created — share the unique link.");
       } else {
         setMailState({
           tone: "err",
-          text: result.error || "The email could not be sent. The invitation is still recorded — use your mail app.",
-          mailto: mailtoFor(to),
+          text: result.error || "The email could not be sent. The invitation exists — copy the link or use your mail app.",
+          mailto: mailtoFor(to, result.link),
+          link: result.link,
         });
-        toast("Invite saved, but the email could not be sent.");
+        toast("Invitation created, but the email could not be sent.");
       }
-    } catch {
-      setMailState({
-        tone: "err",
-        text: "The email could not be sent. The invitation is still recorded — use your mail app.",
-        mailto: mailtoFor(to),
-      });
-      toast("Invite saved, but the email could not be sent.");
+    } catch (error) {
+      const raw = error instanceof Error ? error.message : "";
+      const message = raw.split("\n").map((line) => line.trim()).filter(Boolean).pop() || "Could not create the invitation.";
+      setMailState({ tone: "err", text: message });
+      toast(message);
     } finally {
       setSendingInvite(false);
     }
+  };
+
+  const changeRole = async (userId: string, nextRole: "editor" | "viewer") => {
+    if (!activeWs) return;
+    if (ws?.demo) {
+      setRole(activeWs, userId, nextRole);
+      return;
+    }
+    try {
+      await setMemberRole({ workspaceId: activeWs, userId: userId as Id<"users">, role: nextRole });
+      setRole(activeWs, userId, nextRole);
+      toast("Role updated.");
+    } catch {
+      toast("Could not update that role.");
+    }
+  };
+
+  const withdrawInvite = async (id: Id<"workspaceInvites">, address: string) => {
+    if (!window.confirm(`Revoke the invitation for ${address}?`)) return;
+    try {
+      await revokeInvite({ id });
+      toast(`Invitation for ${address} revoked.`);
+    } catch {
+      toast("Could not revoke that invitation.");
+    }
+  };
+
+  const focusInvite = () => {
+    const field = document.getElementById("shx-email");
+    field?.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => field?.focus(), 350);
   };
 
   const openPicker = () => fileInput.current?.click();
@@ -615,6 +687,10 @@ export default function Collaboration() {
 
   const addFiles = async (list: FileList | null) => {
     if (!list?.length) return;
+    if (!canAttach) {
+      toast("Viewers can download files but cannot attach them.");
+      return;
+    }
     if (!activeWs) {
       toast("Switch to a workspace before attaching files.");
       return;
@@ -686,6 +762,10 @@ export default function Collaboration() {
   };
 
   const clearFiles = async () => {
+    if (!canAttach) {
+      toast("Viewers cannot remove workspace files.");
+      return;
+    }
     if (!attachments.length && !pendingUploads.length) return;
     if (pendingUploads.some((p) => p.status === "uploading")) {
       toast("Wait for the in-flight uploads to finish, then clear.");
@@ -723,6 +803,7 @@ export default function Collaboration() {
   };
 
   const dropKey = (e: KeyboardEvent<HTMLLabelElement>) => {
+    if (!canAttach) return;
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       openPicker();
@@ -760,8 +841,8 @@ export default function Collaboration() {
             <button className="shx-btn lime" onClick={openPicker}>
               <Ico name="upload" /> Upload files
             </button>
-            <button className="shx-btn ghost" onClick={() => copy(inviteNote, "note")}>
-              {copied === "note" ? "✓ Invite copied" : "Copy invite"}
+            <button className="shx-btn ghost" onClick={focusInvite}>
+              <Ico name="mail" /> Invite people
             </button>
           </div>
           <div className="shx-hero-meta">
@@ -805,7 +886,7 @@ export default function Collaboration() {
             <span className={`shx-signal${pending.length ? " on" : ""}`} aria-hidden><i /></span>
           </div>
           <div className="shx-kpi-foot">
-            {pending.length ? "Recorded here — this prototype does not email" : "No one waiting for access"}
+            {pending.length ? "Single-use links · 7-day expiry" : "No one waiting for access"}
           </div>
         </article>
 
@@ -859,27 +940,31 @@ export default function Collaboration() {
                 {attachments.length} file{attachments.length === 1 ? "" : "s"} · {prettySize(totalUploadBytes)}
                 {pendingBytes > 0 && ` · ${prettySize(pendingBytes)} uploading`}
               </span>
-              <button
-                onClick={() => void clearFiles()}
-                disabled={pendingUploads.some((p) => p.status === "uploading")}
-                title={pendingUploads.some((p) => p.status === "uploading") ? "Wait for uploads to finish" : "Remove all attached files"}
-              >
-                Clear all
-              </button>
+              {canAttach && (
+                <button
+                  onClick={() => void clearFiles()}
+                  disabled={pendingUploads.some((p) => p.status === "uploading")}
+                  title={pendingUploads.some((p) => p.status === "uploading") ? "Wait for uploads to finish" : "Remove all attached files"}
+                >
+                  Clear all
+                </button>
+              )}
             </div>
           )}
         </div>
 
         <div className="shx-up-grid">
           <label
-            className={`shx-drop${dragOver ? " is-drag" : ""}`}
-            htmlFor="shx-file"
-            tabIndex={0}
+            className={`shx-drop${dragOver ? " is-drag" : ""}${canAttach ? "" : " is-locked"}`}
+            htmlFor={canAttach ? "shx-file" : undefined}
+            tabIndex={canAttach ? 0 : -1}
+            aria-disabled={!canAttach}
             onKeyDown={dropKey}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragEnter={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false); }}
+            onDragOver={(e) => { if (!canAttach) return; e.preventDefault(); setDragOver(true); }}
+            onDragEnter={(e) => { if (!canAttach) return; e.preventDefault(); setDragOver(true); }}
+            onDragLeave={(e) => { if (!canAttach) return; if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false); }}
             onDrop={(e) => {
+              if (!canAttach) return;
               e.preventDefault();
               setDragOver(false);
               void addFiles(e.dataTransfer.files);
@@ -892,25 +977,32 @@ export default function Collaboration() {
               type="file"
               multiple
               tabIndex={-1}
+              disabled={!canAttach}
               accept={FILE_ACCEPT}
               onChange={(e) => {
                 void addFiles(e.target.files);
                 e.target.value = "";
               }}
             />
-            <span className="shx-drop-ic"><Ico name="upload" /></span>
-            <b>{dragOver ? "Release to attach" : "Drop files here"}</b>
-            <span className="shx-drop-sub">or <span className="shx-browse">browse your device</span> · {prettySize(MAX_FILE_BYTES)} each</span>
-            <span className="shx-drop-formats" aria-hidden>
-              {UPLOAD_FORMATS.slice(0, 5).map((f) => <i key={f.kind}>{f.label}</i>)}
-              <i>+4 more</i>
+            <span className="shx-drop-ic">{canAttach ? <Ico name="upload" /> : <Ico name="shield" />}</span>
+            <b>{canAttach ? (dragOver ? "Release to attach" : "Drop files here") : "Viewer access"}</b>
+            <span className="shx-drop-sub">
+              {canAttach
+                ? <>or <span className="shx-browse">browse your device</span> · {prettySize(MAX_FILE_BYTES)} each</>
+                : "Downloads and exports stay available. Ask the owner for editor access to attach files."}
             </span>
-            <span className="shx-drop-privacy"><Ico name="shield" /> Stored in your account, not just this tab.</span>
+            {canAttach && (
+              <span className="shx-drop-formats" aria-hidden>
+                {UPLOAD_FORMATS.slice(0, 5).map((f) => <i key={f.kind}>{f.label}</i>)}
+                <i>+4 more</i>
+              </span>
+            )}
+            <span className="shx-drop-privacy"><Ico name="shield" /> Shared with the workspace roster.</span>
           </label>
 
           <div className="shx-tray">
             <div className="shx-tray-head">
-              <span className="shx-kicker">Your files</span>
+              <span className="shx-kicker">Workspace files</span>
               <span className="shx-tray-count" aria-live="polite">{attachments.length + pendingUploads.length}</span>
               {attachments.length + pendingUploads.length > 0 && (
                 <label className="shx-file-search">
@@ -934,8 +1026,8 @@ export default function Collaboration() {
             ) : attachments.length + pendingUploads.length === 0 ? (
               <div className="shx-tray-empty">
                 <span className="shx-empty-stack" aria-hidden><i /><i /><i /></span>
-                <b>No files attached yet</b>
-                <span>The report can list every file you add — names, types and sizes, never the contents.</span>
+                <b>No shared files yet</b>
+                <span>The report can list every file with its uploader — names, types and sizes, never the contents.</span>
               </div>
             ) : (
               <>
@@ -984,16 +1076,21 @@ export default function Collaboration() {
                         <span className={`shx-file-ic f-${f.kind}`}><FileGlyph kind={f.kind as FileKind} /></span>
                         <span className="shx-file-main">
                           <b title={f.name}>{f.name}</b>
-                          <small>{formatLabel(f.kind as FileKind)} · {f.ext} · {prettySize(f.size)}</small>
+                          <small>
+                            {f.uploaderName ? `${f.uploaderName} · ` : ""}
+                            {formatLabel(f.kind as FileKind)} · {f.ext} · {prettySize(f.size)}
+                          </small>
                         </span>
                         <span className="shx-file-state">Stored</span>
                         <span className="shx-file-actions">
                           <button onClick={() => void saveAttachment(f)} aria-label={`Download ${f.name}`} title="Download original">
                             <Ico name="download" />
                           </button>
-                          <button onClick={() => void removeFile(f.id, f.name)} aria-label={`Remove ${f.name}`} title="Remove">
-                            <Ico name="trash" />
-                          </button>
+                          {canAttach && (
+                            <button onClick={() => void removeFile(f.id, f.name)} aria-label={`Remove ${f.name}`} title="Remove">
+                              <Ico name="trash" />
+                            </button>
+                          )}
                         </span>
                       </motion.li>
                     ))}
@@ -1099,6 +1196,11 @@ export default function Collaboration() {
             <div className={`shx-mailstate ${mailState.tone}`} role="status" aria-live="polite">
               <span className="shx-mailstate-dot" aria-hidden="true">{mailState.tone === "ok" ? "✓" : "!"}</span>
               <p>{mailState.text}</p>
+              {mailState.link && (
+                <button className="shx-mailstate-link" onClick={() => copy(mailState.link!, "invite-link")}>
+                  {copied === "invite-link" ? "✓ Copied" : "Copy link"}
+                </button>
+              )}
               {mailState.mailto && (
                 <a className="shx-mailstate-link" href={mailState.mailto}>
                   Open mail app
@@ -1125,7 +1227,7 @@ export default function Collaboration() {
                       className="shx-role"
                       value={m.role}
                       aria-label={`Role for ${u?.name || "member"}`}
-                      onChange={(e) => setRole(activeWs!, m.userId, e.target.value as Membership["role"])}
+                      onChange={(e) => void changeRole(m.userId, e.target.value as "editor" | "viewer")}
                     >
                       <option value="editor">editor</option>
                       <option value="viewer">viewer</option>
@@ -1151,6 +1253,7 @@ export default function Collaboration() {
                     <small>invited as {i.role}</small>
                   </div>
                   <Badge tone="yellow">{i.status}</Badge>
+                  <button className="shx-revoke" onClick={() => void withdrawInvite(i.id, i.email)}>Revoke</button>
                 </div>
               ))}
             </div>
@@ -1170,14 +1273,10 @@ export default function Collaboration() {
               aria-label="Message included in the invitation email and copied invite"
             />
             <div className="shx-note-foot">
-              <code>{origin}/login</code>
-              <button onClick={() => copy(`${origin}/login`, "link")}>{copied === "link" ? "✓ Link copied" : "Copy link"}</button>
-              <button className="shx-btn lime sm" onClick={() => copy(inviteNote, "note")}>
-                {copied === "note" ? "✓ Copied" : "Copy invite"}
-              </button>
+              <span className="shx-note-hint">A unique, single-use invite link is created when you press Invite. It expires after seven days.</span>
             </div>
           </div>
-          <p className="shx-fine">Invitations are recorded in this workspace and emailed when delivery is configured. Attachments are stored in your account, not in this tab.</p>
+          <p className="shx-fine">Invitations are emailed when delivery is configured, can be revoked before acceptance, and grant the role you choose when accepted.</p>
         </motion.section>
 
         <motion.aside
@@ -1244,14 +1343,13 @@ export default function Collaboration() {
           </div>
 
           <div className="shx-linkcard">
-            <span className="shx-link-ic"><Ico name="link" /></span>
+            <span className="shx-link-ic"><Ico name="shield" /></span>
             <div>
-              <span className="shx-kicker">Invite link</span>
-              <code>{origin}/login</code>
+              <span className="shx-kicker">Invite links</span>
+              <code>Single-use · 7-day expiry · revocable</code>
             </div>
-            <button onClick={() => copy(`${origin}/login`, "link")}>{copied === "link" ? "✓" : "Copy"}</button>
           </div>
-          <p className="shx-fine">Exports are generated in the browser from workspace data. Attached files are stored in your account; the report lists their name, type and size.</p>
+          <p className="shx-fine">Exports are generated in the browser from workspace data. Attached files are shared with the workspace roster; the report lists their name, type and size.</p>
         </motion.aside>
       </div>
 

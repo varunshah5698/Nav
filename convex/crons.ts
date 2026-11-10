@@ -17,4 +17,10 @@ crons.hourly(
   internal.inviteEmails.prune,
 );
 
+crons.hourly(
+  "prune workspace invitations",
+  { minuteUTC: 29 },
+  internal.workspaceInvites.prune,
+);
+
 export default crons;

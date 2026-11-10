@@ -21,7 +21,7 @@ Register with Google → demo workspace seeds automatically. Google-only account
 - **Experiments**: wizard → plan approval gate → isolated CPU sandbox (timeout, logs) → run comparison → save to memory. Colab = honest stub.
 - **Memory**: 9 kinds, error→fix linking, reuse counts, draft-experiment recommendations.
 - **Discovery**: hybrid TF-IDF + keyword + filters, excerpts with highlights, search analytics (volume/engagement/zero-result).
-- **Collab**: owner/editor/viewer (enforced), access roster with Brevo-backed invite email (and a mailto fallback when email is not configured), workspace activity, persistent handoff files in Convex file storage, ZIP bundles (selected export + attachments + manifest), and an export studio (Report MD, BibTeX, Graph JSON, Exp CSV) with live preview, size/line count and export history. Report sections and sources are selectable; every export is generated in the browser.
+- **Collab**: real shared workspaces (Convex-backed graph, sources, agents, experiments, memory and activity), server-enforced owner/editor/viewer roles, single-use email invitations with an `/invite/:token` acceptance page, shared handoff files in Convex file storage, ZIP bundles (selected export + attachments + manifest), and an export studio (Report MD, BibTeX, Graph JSON, Exp CSV) with live preview, size/line count and export history. Demo workspaces are personal and are promoted to a shared workspace on the first invite.
 - **Dashboard**: real KPIs + activity/distribution/outcome/agent/graph panels, range filter, empty states, no fabricated deltas.
 
 ## Authentication & cloud sync (Convex Auth)
@@ -85,17 +85,38 @@ npx convex env set BREVO_SENDER_NAME ResearchGraph
 `BREVO_API_KEY` and the sender settings live only in the Convex deployment
 environment — never in `.env.local`, never in a `VITE_` variable, never in git.
 
-The same sender powers workspace invitation emails from the Share page. When
-the Brevo variables are absent, the invite is still recorded and the page offers
-a `mailto:` fallback instead of pretending it sent. Invite sending is limited to
-20 messages per authenticated user per hour.
+The same sender powers workspace invitation emails from the Share page. Each
+invite creates a single-use token (stored only as a SHA-256 hash), is emailed as
+a `/invite/<token>` link, expires after seven days, and can be revoked. When the
+Brevo variables are absent, the invite is still created and the owner can copy
+the unique link or use the `mailto:` fallback. Invite sending is limited to 20
+messages per authenticated user per hour.
 
 Handoff attachments are stored in Convex file storage: bytes live in built-in
-storage and metadata lives in the `attachments` table, so files survive refresh
-and are available on another device. They are not part of the 1 MiB snapshot.
-Limits are enforced server-side: 20 MB per file, 60 MB and 100 files per
-user per workspace. `npx convex deploy` is required after changing these functions or the
-schema.
+storage and metadata lives in the `attachments` table. They are shared with
+every accepted workspace member and survive refresh or a device switch. Limits
+are enforced server-side: 20 MB per file, 60 MB and 100 files per workspace.
+`npx convex deploy` is required after changing these functions or the schema.
+
+### Shared workspaces
+
+Non-demo workspaces live in `sharedWorkspaces` (one JSON payload per workspace),
+`workspaceMembers` (the access roster) and `workspaceInvites` (single-use
+tokens). `useWorkspaceSync` keeps the local Zustand cache in step with those
+tables: owners register a new workspace, editors/owners save changes, and every
+member receives remote updates. Invite acceptance adds the authenticated user
+to the roster and their next sync pulls in the graph, sources, experiments,
+memory, activity and shared files. Access checks are server-side, not just in
+the UI.
+
+The per-user snapshot remains a cache/backup; it is no longer the authority for
+shared workspaces. Demo workspaces stay personal so every new account can
+explore the sample without sharing it; inviting from a demo promotes it to a
+real shared workspace and moves any existing attachments across.
+
+Invite links use a non-localhost `SITE_URL` when it is set and otherwise fall
+back to the browser origin, so a localhost value left over from development
+cannot leak into production email.
 
 Deploy the schema/functions with `npx convex deploy`, set `SITE_URL` on the
 Convex deployment to the public app origin (for the Render service:
@@ -137,9 +158,11 @@ the client skips snapshots over ~900 KB with a console warning.
 
 ### Known limits
 
-- Password reset is not configured (needs an email provider such as Resend).
-  A forgotten password currently requires recreating the account under a new
-  email. Add `Password({ reset })` before using real accounts.
+- Shared workspace payloads are capped at ~900 KB. Concurrent edits use
+  last-write-wins at the workspace level; there is no CRDT merge, so two people
+  editing different panels at the same moment can overwrite one another.
+- Password reset emails require the Brevo environment variables above; without
+  them the OTP is generated but cannot be delivered.
 - Google and password accounts are separate even with the same email; account
   linking is not enabled.
 

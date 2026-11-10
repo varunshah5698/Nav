@@ -274,6 +274,9 @@
   transform:translateY(-1px);
 }
 .shx-drop:focus-visible{outline:2px solid var(--shx-lime);outline-offset:3px}
+.shx-drop.is-locked{cursor:default;opacity:.82}
+.shx-drop.is-locked:hover{border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.018);box-shadow:none;transform:none}
+.shx-drop.is-locked:hover .shx-drop-ic{transform:none}
 .shx-file-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .shx-drop-ic{
   width:62px;height:62px;border-radius:20px;display:grid;place-items:center;color:#FFB08C;
@@ -463,7 +466,7 @@
 .shx-seg button:disabled{opacity:.45;cursor:not-allowed}
 .shx-hint{margin:8px 0 0;font-size:10px;color:var(--shx-gold)}
 .shx-mailstate{
-  display:flex;align-items:flex-start;gap:8px;margin-top:9px;padding:9px 11px;border-radius:12px;
+  display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px;margin-top:9px;padding:9px 11px;border-radius:12px;
   border:1px solid var(--shx-line);background:rgba(255,255,255,.035);
   font-size:10px;line-height:1.5;color:#B9B4AD;
 }
@@ -480,8 +483,8 @@
 .shx-mailstate.err .shx-mailstate-dot{background:rgba(255,147,122,.14);color:#FFB3A0}
 .shx-mailstate-link{
   flex:none;align-self:center;border:1px solid rgba(216,248,94,.28);background:rgba(216,248,94,.1);
-  color:#D8F85E;border-radius:999px;padding:4px 9px;font-size:9.5px;font-weight:700;text-decoration:none;
-  transition:background .15s;
+  color:#D8F85E;border-radius:999px;padding:4px 9px;font-family:inherit;font-size:9.5px;font-weight:700;
+  text-decoration:none;cursor:pointer;transition:background .15s;
 }
 .shx-mailstate-link:hover{background:rgba(216,248,94,.18)}
 
@@ -518,6 +521,12 @@
   background:rgba(242,182,75,.12);color:#F2D48A;
 }
 .shx-pending-ic svg{width:13px;height:13px}
+.shx-revoke{
+  flex:none;border:1px solid rgba(255,147,122,.24);background:transparent;color:#FFB3A0;
+  border-radius:999px;padding:3px 7px;font-family:inherit;font-size:8.5px;font-weight:700;cursor:pointer;
+  transition:background .14s;
+}
+.shx-revoke:hover{background:rgba(255,147,122,.12)}
 
 .shx-note{margin-top:14px;padding:11px 12px;border-radius:14px;background:rgba(0,0,0,.16);border:1px solid var(--shx-line-soft)}
 .shx-note-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
@@ -539,6 +548,7 @@
   border-radius:999px;padding:4px 9px;font-family:inherit;font-size:9.5px;font-weight:650;cursor:pointer;transition:.15s;
 }
 .shx-note-foot>button:not(.shx-btn):hover{background:rgba(255,255,255,.08);color:#fff}
+.shx-note-hint{font-size:9.5px;line-height:1.45;color:#8F8A83}
 
 .shx-map{padding-bottom:18px}
 .shx-donut-row{display:grid;grid-template-columns:168px minmax(0,1fr);gap:10px;align-items:center;margin-top:10px}

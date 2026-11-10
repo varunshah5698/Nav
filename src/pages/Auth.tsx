@@ -193,12 +193,17 @@ function Alert({ children }: { children: ReactNode }) {
 }
 
 /* ---------- auth plumbing ---------- */
-function useRedirectIfSignedIn() {
+function safeNext(value: string | null): string | null {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
+  return value;
+}
+
+function useRedirectIfSignedIn(next: string | null) {
   const nav = useNavigate();
   const { isLoading, isAuthenticated } = useConvexAuth();
   useEffect(() => {
-    if (!isLoading && isAuthenticated) nav("/app/dashboard", { replace: true });
-  }, [isLoading, isAuthenticated, nav]);
+    if (!isLoading && isAuthenticated) nav(next || "/app/dashboard", { replace: true });
+  }, [isLoading, isAuthenticated, nav, next]);
 }
 
 function authErrorMessage(e: unknown, register: boolean) {
@@ -216,7 +221,7 @@ function authErrorMessage(e: unknown, register: boolean) {
 }
 
 /* ---------- email + password ---------- */
-function PasswordForm({ mode }: { mode: Mode }) {
+function PasswordForm({ mode, next }: { mode: Mode; next: string | null }) {
   const { signIn } = useAuthActions();
   const nav = useNavigate();
   const [email, setEmail] = useState("");
@@ -239,7 +244,7 @@ function PasswordForm({ mode }: { mode: Mode }) {
     setBusy(true);
     try {
       await signIn("password", { email: mail, password: pass, flow: register ? "signUp" : "signIn" });
-      nav("/app/dashboard", { replace: true });
+      nav(next || "/app/dashboard", { replace: true });
     } catch (e) {
       setErr(authErrorMessage(e, register));
       setBusy(false);
@@ -324,7 +329,7 @@ function PasswordForm({ mode }: { mode: Mode }) {
 }
 
 /* ---------- google ---------- */
-function GoogleButton({ mode }: { mode: Mode }) {
+function GoogleButton({ mode, next }: { mode: Mode; next: string | null }) {
   const { signIn } = useAuthActions();
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -334,7 +339,7 @@ function GoogleButton({ mode }: { mode: Mode }) {
     setErr("");
     setBusy(true);
     try {
-      await signIn("google", { redirectTo: "/app/dashboard" });
+      await signIn("google", { redirectTo: next || "/app/dashboard" });
     } catch (e) {
       setErr(authErrorMessage(e, mode === "register"));
       setBusy(false);
@@ -353,16 +358,17 @@ function GoogleButton({ mode }: { mode: Mode }) {
   );
 }
 
-function AuthOptions({ mode }: { mode: Mode }) {
+function AuthOptions({ mode, next }: { mode: Mode; next: string | null }) {
+  const suffix = next ? `?next=${encodeURIComponent(next)}` : "";
   return (
     <>
-      <PasswordForm mode={mode} />
+      <PasswordForm mode={mode} next={next} />
       <div className="auth-div">or</div>
-      <GoogleButton mode={mode} />
+      <GoogleButton mode={mode} next={next} />
       <p className="auth-foot">
         {mode === "register"
-          ? <>Already have an account? <Link to="/login">Sign in</Link></>
-          : <>New here? <Link to="/register">Create an account</Link></>}
+          ? <>Already have an account? <Link to={`/login${suffix}`}>Sign in</Link></>
+          : <>New here? <Link to={`/register${suffix}`}>Create an account</Link></>}
       </p>
       <p className="auth-foot">
         Your workspace, graph and sources are saved to Convex and restored every time you sign in.
@@ -373,8 +379,9 @@ function AuthOptions({ mode }: { mode: Mode }) {
 
 /* ---------- pages ---------- */
 export function Login() {
-  useRedirectIfSignedIn();
   const [params] = useSearchParams();
+  const next = safeNext(params.get("next"));
+  useRedirectIfSignedIn(next);
   return (
     <Frame mode="login" title="Welcome back" sub={<>Sign in to open <b>your research workspace</b>.</>}>
       {params.get("reset") === "1" && (
@@ -383,16 +390,18 @@ export function Login() {
           <span>Password updated. Sign in with your new password.</span>
         </div>
       )}
-      <AuthOptions mode="login" />
+      <AuthOptions mode="login" next={next} />
     </Frame>
   );
 }
 
 export function Register() {
-  useRedirectIfSignedIn();
+  const [params] = useSearchParams();
+  const next = safeNext(params.get("next"));
+  useRedirectIfSignedIn(next);
   return (
     <Frame mode="register" title="Create your account" sub={<>Email and password, or <b>continue with Google</b>.</>}>
-      <AuthOptions mode="register" />
+      <AuthOptions mode="register" next={next} />
     </Frame>
   );
 }

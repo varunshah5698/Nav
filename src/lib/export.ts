@@ -77,6 +77,7 @@ export interface HandoffFile {
   name: string;
   ext: string;
   bytes: number;
+  uploader?: string;
 }
 
 export interface ReportParts {
@@ -202,7 +203,14 @@ export function workspaceReport(
     out.push(`## Handoff files`);
     out.push(
       files.length
-        ? files.map((f) => `- ${f.name} _(${f.ext.toUpperCase()}, ${prettySize(f.bytes)})_`).join("\n")
+        ? files
+            .map(
+              (f) =>
+                `- ${f.name} _(${f.ext.toUpperCase()}, ${prettySize(f.bytes)})_${
+                  f.uploader ? ` — uploaded by ${f.uploader}` : ""
+                }`,
+            )
+            .join("\n")
         : "_No files attached._",
     );
     out.push(``);

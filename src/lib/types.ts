@@ -43,6 +43,17 @@ export interface MemoryEntry {
 }
 export interface Activity { id:string; workspaceId:string; kind:string; text:string; refType?:string; refId?:string; createdAt:string }
 export interface Invite { id:string; workspaceId:string; email:string; role:Role; status:"pending"|"accepted" }
+export interface SharedWorkspaceMeta { workspaceId:string; name:string; description:string; ownerId:string; createdAt:string }
+export interface SharedMember { workspaceId:string; userId:string; role:Role; joinedAt:number; name:string; email:string; image?:string|null }
+export interface SharedPayload {
+  nodes:RNode[]; edges:Edge[]; sources:Source[]; agents:AgentRun[];
+  experiments:Experiment[]; memories:MemoryEntry[]; activities:Activity[];
+}
+export interface SharedSyncInput {
+  workspaces:SharedWorkspaceMeta[];
+  members:SharedMember[];
+  payloads:Record<string,SharedPayload>;
+}
 export interface ExportJob { id:string; workspaceId:string; kind:string; format:string; createdAt:string; status:string; size?:string }
 export interface SearchLog { id:string; workspaceId:string; query:string; results:number; opened:boolean; createdAt:string; durationMs:number }
 export interface Session { userId:string; createdAt:string; expiresAt:string }

@@ -2,6 +2,8 @@ import { defineSchema, defineTable } from "convex/server";
 import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 
+const workspaceRole = v.union(v.literal("owner"), v.literal("editor"), v.literal("viewer"));
+
 // Kept in step with UPLOAD_FORMATS in src/pages/Collaboration.tsx.
 const attachmentKind = v.union(
   v.literal("pdf"),
@@ -47,7 +49,50 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_user_workspace_createdAt", ["userId", "workspaceId", "createdAt"])
+    .index("by_workspace_createdAt", ["workspaceId", "createdAt"])
     .index("by_storage", ["storageId"]),
+
+  // Shared workspace: one canonical JSON payload per workspace. Members are
+  // tracked separately and are the only source of access.
+  sharedWorkspaces: defineTable({
+    workspaceId: v.string(),
+    ownerId: v.id("users"),
+    name: v.string(),
+    description: v.string(),
+    createdAt: v.string(),
+    payload: v.string(),
+    revision: v.number(),
+    updatedAt: v.number(),
+    updatedBy: v.id("users"),
+  })
+    .index("by_workspaceId", ["workspaceId"])
+    .index("by_ownerId", ["ownerId"]),
+
+  workspaceMembers: defineTable({
+    workspaceId: v.string(),
+    userId: v.id("users"),
+    role: workspaceRole,
+    joinedAt: v.number(),
+  })
+    .index("by_workspace", ["workspaceId"])
+    .index("by_user", ["userId"])
+    .index("by_workspace_user", ["workspaceId", "userId"]),
+
+  workspaceInvites: defineTable({
+    workspaceId: v.string(),
+    email: v.string(),
+    role: v.union(v.literal("editor"), v.literal("viewer")),
+    tokenHash: v.string(),
+    invitedBy: v.id("users"),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    acceptedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+  })
+    .index("by_tokenHash", ["tokenHash"])
+    .index("by_workspace", ["workspaceId"])
+    .index("by_email", ["email"])
+    .index("by_createdAt", ["createdAt"]),
 
   // Rate-limit ledger for invite emails. No recipient or message content.
   inviteEmails: defineTable({

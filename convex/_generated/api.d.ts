@@ -17,6 +17,8 @@ import type * as passwordPolicy from "../passwordPolicy.js";
 import type * as passwordReset from "../passwordReset.js";
 import type * as snapshots from "../snapshots.js";
 import type * as users from "../users.js";
+import type * as workspaceInvites from "../workspaceInvites.js";
+import type * as workspaceSync from "../workspaceSync.js";
 
 import type {
   ApiFromModules,
@@ -34,6 +36,8 @@ declare const fullApi: ApiFromModules<{
   passwordReset: typeof passwordReset;
   snapshots: typeof snapshots;
   users: typeof users;
+  workspaceInvites: typeof workspaceInvites;
+  workspaceSync: typeof workspaceSync;
 }>;
 
 /**

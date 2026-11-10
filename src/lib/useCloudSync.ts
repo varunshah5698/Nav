@@ -9,17 +9,23 @@ const MAX_BYTES = 900_000;
 
 function serialize() {
   const s = useStore.getState();
+  // Shared workspace data is authoritative in Convex and fetched by
+  // useWorkspaceSync. Keep the per-user snapshot for the personal/demo cache,
+  // workspace metadata, exports and search history.
+  const sharedIds = new Set(s.workspaces.filter((w) => !w.demo).map((w) => w.id));
+  const localOnly = <T extends { workspaceId: string }>(items: T[]) =>
+    items.filter((item) => !sharedIds.has(item.workspaceId));
   return JSON.stringify({
     workspaces: s.workspaces,
     memberships: s.memberships,
     activeWs: s.activeWs,
-    nodes: s.nodes,
-    edges: s.edges,
-    sources: s.sources,
-    agents: s.agents,
-    experiments: s.experiments,
-    memories: s.memories,
-    activities: s.activities,
+    nodes: localOnly(s.nodes),
+    edges: localOnly(s.edges),
+    sources: localOnly(s.sources),
+    agents: localOnly(s.agents),
+    experiments: localOnly(s.experiments),
+    memories: localOnly(s.memories),
+    activities: localOnly(s.activities),
     invites: s.invites,
     exports: s.exports,
     searchLogs: s.searchLogs,

@@ -13,8 +13,10 @@ import Experiments from "./pages/Experiments";
 import Memory from "./pages/Memory";
 import Discovery from "./pages/Discovery";
 import Collaboration from "./pages/Collaboration";
+import Invite from "./pages/Invite";
 import { useStore } from "./lib/store";
 import { useCloudSync } from "./lib/useCloudSync";
+import { useWorkspaceSync } from "./lib/useWorkspaceSync";
 import { api } from "../convex/_generated/api";
 import "./styles/global.css";
 
@@ -42,6 +44,7 @@ function CanvasRoute(){
 }
 export default function App(){
   useCloudSync();
+  useWorkspaceSync();
   return <BrowserRouter>
     <Routes>
       <Route path="/" element={<Landing/>}/>
@@ -49,6 +52,7 @@ export default function App(){
       <Route path="/register" element={<Register/>}/>
       <Route path="/signup" element={<Register/>}/>
       <Route path="/forgot-password" element={<ForgotPassword/>}/>
+      <Route path="/invite/:token" element={<Invite/>}/>
       <Route path="/app/dashboard" element={<Guard><Dashboard/></Guard>}/>
       <Route path="/app/analyst" element={<Guard><Analyst/></Guard>}/>
       <Route path="/app/canvas" element={<Guard><Canvas/></Guard>}/>

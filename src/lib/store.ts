@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Activity, AgentName, AgentRun, Edge, Experiment, Invite, MemoryEntry, RNode, SearchLog, Source, User, Workspace, Membership, ExportJob } from "./types";
+import type { Activity, AgentName, AgentRun, Edge, Experiment, Invite, MemoryEntry, RNode, SearchLog, Source, User, Workspace, Membership, ExportJob, SharedSyncInput } from "./types";
 import { seedDemo } from "./seed";
 import { chunkPages, leadOf, digestSource } from "./text";
 
@@ -19,8 +19,10 @@ interface State {
   clearSession:()=>void;
   seedFor:(userId:string)=>void;
   loadSnapshot:(payload:string)=>void;
+  applySharedSync:(input:SharedSyncInput)=>void;
   // ws
   createWorkspace:(name:string,desc:string)=>void; switchWs:(id:string)=>void;
+  promoteDemoWorkspace:(id:string)=>string;
   canEdit:()=>boolean; isOwner:()=>boolean;
   // generic helpers
   toast:(m:string)=>void; log:(ws:string,kind:string,text:string,refType?:string,refId?:string)=>void;
@@ -104,6 +106,56 @@ export const useStore = create<State>()(persist((set,get)=>({
     get().toast("Workspace created.");
   },
   switchWs:(id)=>set({activeWs:id}),
+  promoteDemoWorkspace:(id)=>{
+    const src=get().workspaces.find(w=>w.id===id&&w.demo);
+    if(!src) return id;
+    const newId=uid("ws");
+    const remap=<T extends {workspaceId:string}>(arr:T[]):T[]=>arr.map(x=>x.workspaceId===id?{...x,workspaceId:newId}:x);
+    set(s=>({
+      workspaces:s.workspaces.map(w=>w.id===id?{...w,id:newId,demo:false}:w),
+      memberships:s.memberships.map(m=>m.workspaceId===id?{...m,workspaceId:newId}:m),
+      activeWs:s.activeWs===id?newId:s.activeWs,
+      nodes:remap(s.nodes), edges:remap(s.edges), sources:remap(s.sources), agents:remap(s.agents),
+      experiments:remap(s.experiments), memories:remap(s.memories), activities:remap(s.activities),
+      invites:remap(s.invites), exports:remap(s.exports), searchLogs:remap(s.searchLogs),
+    }));
+    get().log(newId,"workspace","Demo workspace promoted to a shared workspace.");
+    return newId;
+  },
+  applySharedSync:(input)=>{
+    const sharedIds=new Set(input.workspaces.map(w=>w.workspaceId));
+    set(s=>{
+      const users=[...s.users];
+      for(const m of input.members){
+        const i=users.findIndex(u=>u.id===m.userId);
+        const profile={name:m.name,email:m.email,image:m.image};
+        if(i>=0) users[i]={...users[i],...profile};
+        else users.push({id:m.userId,...profile,createdAt:now()});
+      }
+      const workspaces=[...s.workspaces];
+      for(const meta of input.workspaces){
+        const i=workspaces.findIndex(w=>w.id===meta.workspaceId);
+        const next:Workspace={id:meta.workspaceId,name:meta.name,description:meta.description,ownerId:meta.ownerId,createdAt:meta.createdAt};
+        if(i>=0) workspaces[i]={...workspaces[i],...next}; else workspaces.push(next);
+      }
+      const memberships=[
+        ...s.memberships.filter(m=>!sharedIds.has(m.workspaceId)),
+        ...input.members.map(m=>({workspaceId:m.workspaceId,userId:m.userId,role:m.role})),
+      ];
+      let nodes=s.nodes, edges=s.edges, sources=s.sources, agents=s.agents;
+      let experiments=s.experiments, memories=s.memories, activities=s.activities;
+      for(const [wsId,payload] of Object.entries(input.payloads)){
+        nodes=[...nodes.filter(x=>x.workspaceId!==wsId), ...payload.nodes.map(x=>({...x,workspaceId:wsId}))];
+        edges=[...edges.filter(x=>x.workspaceId!==wsId), ...payload.edges.map(x=>({...x,workspaceId:wsId}))];
+        sources=[...sources.filter(x=>x.workspaceId!==wsId), ...payload.sources.map(x=>({...x,workspaceId:wsId}))];
+        agents=[...agents.filter(x=>x.workspaceId!==wsId), ...payload.agents.map(x=>({...x,workspaceId:wsId}))];
+        experiments=[...experiments.filter(x=>x.workspaceId!==wsId), ...payload.experiments.map(x=>({...x,workspaceId:wsId}))];
+        memories=[...memories.filter(x=>x.workspaceId!==wsId), ...payload.memories.map(x=>({...x,workspaceId:wsId}))];
+        activities=[...activities.filter(x=>x.workspaceId!==wsId), ...payload.activities.map(x=>({...x,workspaceId:wsId}))];
+      }
+      return {users,workspaces,memberships,nodes,edges,sources,agents,experiments,memories,activities};
+    });
+  },
   canEdit:()=>{
     const {memberships,activeWs,sessionUserId,workspaces}=get();
     if(!activeWs||!sessionUserId) return false;
