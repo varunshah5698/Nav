@@ -1,0 +1,56 @@
+# Render Blueprint for ResearchGraph (root app).
+#
+# Deploy: Render Dashboard → New → Blueprint → choose this repo → Apply.
+# Render creates a Static Site for the Vite build and a Python Web Service for
+# the FastAPI analyst API, then builds both from this file.
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. Frontend — Vite/React SPA served from Render's CDN.
+  #    BrowserRouter needs every unmatched path rewritten to index.html.
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: researchgraph-web
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    envVars:
+      - key: NODE_VERSION
+        value: 22.23.4
+      # Vite inlines VITE_API_URL at build time — there is no runtime env on a
+      # static site. If Render assigns the API a different host (names are
+      # globally unique, so a suffix can be added), update this value here or in
+      # the dashboard and redeploy the static site.
+      - key: VITE_API_URL
+        value: https://researchgraph-api.onrender.com
+
+  # ---------------------------------------------------------------------------
+  # 2. API — FastAPI streaming proxy for Groq; the key never reaches the bundle.
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: researchgraph-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.6
+      # Set in the dashboard (Environment → GROQ_API_KEY); never commit a key.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      # Must match the public static-site origin exactly (CORS allowlist).
+      - key: CORS_ORIGINS
+        value: https://researchgraph-web.onrender.com

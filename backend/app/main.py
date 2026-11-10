@@ -8,8 +8,15 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
+
+def cors_origins() -> list[str]:
+    """Allowed browser origins, comma-separated in CORS_ORIGINS (localhost by default)."""
+    raw = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+    return [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
+
+
 app = FastAPI(title="ResearchGraph API", version="0.1.0")
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=cors_origins(), allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 DEFAULT_MODEL = "openai/gpt-oss-120b"

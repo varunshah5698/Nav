@@ -23,6 +23,16 @@ Register (any email) → demo workspace seeds automatically. Login persists loca
 ## Deploy (Freebuff Sites)
 Static build, published at <https://site-942642bb18134977bde5709248101d00.freebuff.page>. `sites/deploy.json` is the Sites manifest (`sites/worker.js` just serves `../dist`), and `sites/site.json` holds the project id and environment URLs. `npm run build` then deploy that manifest. `sites/worker.js` also serves the AI Analyst API (`GET /api/analyst/status`, `POST /api/analyst`) so the deployed site streams real answers: it reads `GROQ_API_KEY` from the Worker secret (Sites → Secrets, set per environment) and proxies Groq, rewriting SSE into the plain-text stream the client reads. The key never ships in the bundle — locally the same routes come from `vite.config.ts` and `backend/app/main.py`.
 
+## Deploy (Render)
+`render.yaml` is a Render Blueprint for this root app — a Static Site (`npm ci && npm run build` → `dist`, `/*` rewritten to `/index.html` for React Router) plus a Python Web Service for `backend/app/main.py` (FastAPI streaming the Groq analyst).
+
+1. Render Dashboard → **New → Blueprint** → pick this repo → **Apply**. Both services are created from `render.yaml`.
+2. Set `GROQ_API_KEY` on the `researchgraph-api` service. It is `sync: false`, so Render prompts for it and it never enters git.
+3. Check the two hostnames. The Blueprint assumes `https://researchgraph-web.onrender.com` (static site, `CORS_ORIGINS` on the API) and `https://researchgraph-api.onrender.com` (API, `VITE_API_URL` on the static site). Render appends a suffix when a name is taken, so update those values and redeploy if yours differ — `VITE_API_URL` is inlined at build time.
+4. Verify: `GET /health` on the API, `/api/analyst/status` reports whether the key is visible to it. Free instances sleep when idle, so the first analyst call after a quiet period can take ~30 s.
+
+The API allows browser origins listed in `CORS_ORIGINS` (comma-separated, defaults to `localhost:5173`), so local `npm run dev` keeps working against it.
+
 ## Production path
 `backend/app/main.py` + `docker-compose.yml` (FastAPI, Postgres, Neo4j, Qdrant, worker, MinIO). Swap `src/lib/store.ts` persistence to API client; keys stay server-side (`OPENAI_API_KEY`/`GEMINI_API_KEY` never in bundle). PyMuPDF, Sentence-Transformers, LangGraph, Docker runners live in backend.
 
