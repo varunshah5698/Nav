@@ -8,7 +8,8 @@ export const get = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
-    if (userId === null) throw new Error("Not authenticated");
+    // A signed-out client may race the first query while the token is being read.
+    if (userId === null) return null;
     const snap = await ctx.db
       .query("userSnapshots")
       .withIndex("by_user", (q) => q.eq("userId", userId))
