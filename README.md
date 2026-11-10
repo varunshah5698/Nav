@@ -9,7 +9,9 @@ npm run dev      # → http://localhost:5173
 ```
 Register with Google → demo workspace seeds automatically. Google-only accounts can add an email + password after a verified OTP reset. Login persists through Convex Auth.
 
-**Live:** <https://researchgraph-steel.vercel.app> — static Vite build on Vercel with the analyst endpoint in `api/`. The AI Analyst reports offline until `GROQ_API_KEY` is set in the Vercel project.
+**Live:** <https://nav-y35d.onrender.com> (Render). Vercel mirror:
+<https://researchgraph-steel.vercel.app>. The AI Analyst reports offline until
+`GROQ_API_KEY` is set on the deployment that serves `/api/analyst`.
 
 ## What works now (all real, no dead buttons)
 - **AI Analyst**: Groq-backed analyst grounded in sources, graph, experiment runs and memory — scope switches, streamed answers, per-item citations; the key stays server-side behind `/api/analyst`.
