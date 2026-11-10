@@ -94,7 +94,7 @@ Handoff attachments are stored in Convex file storage: bytes live in built-in
 storage and metadata lives in the `attachments` table, so files survive refresh
 and are available on another device. They are not part of the 1 MiB snapshot.
 Limits are enforced server-side: 20 MB per file, 60 MB and 100 files per
-workspace. `npx convex deploy` is required after changing these functions or the
+user per workspace. `npx convex deploy` is required after changing these functions or the
 schema.
 
 Deploy the schema/functions with `npx convex deploy`, set `SITE_URL` on the

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { zip } from "fflate";
@@ -136,7 +136,7 @@ function rejectReason(file: File, total: number, seen: SeenFile[]): string | nul
   if (!kindOf(ext)) return ext ? `Unsupported .${ext} files` : "File has no extension";
   if (!file.size) return "File is empty";
   if (file.size > MAX_FILE_BYTES) return `Larger than ${prettySize(MAX_FILE_BYTES)}`;
-  if (total + file.size > MAX_TOTAL_BYTES) return `Over the ${prettySize(MAX_TOTAL_BYTES)} workspace cap`;
+  if (total + file.size > MAX_TOTAL_BYTES) return `Over the ${prettySize(MAX_TOTAL_BYTES)} account cap`;
   if (seen.some((s) => s.name === file.name && s.size === file.size && (s.lastModified === undefined || s.lastModified === file.lastModified)))
     return "Already attached";
   return null;
@@ -380,6 +380,14 @@ export default function Collaboration() {
     [attachments],
   );
 
+  // Pending rows and mail feedback belong to one workspace; drop them on switch.
+  useEffect(() => {
+    setPendingUploads([]);
+    setMailState(null);
+    setFileQuery("");
+    setRejects([]);
+  }, [activeWs]);
+
   const roleCount = (r: Membership["role"]) => members.filter((m) => m.role === r).length;
   const exportMix = FORMATS.map((f) => ({
     id: f.id,
@@ -491,7 +499,7 @@ export default function Collaboration() {
   const inviteNote = [
     `${me?.name || "A researcher"} invited you to “${ws?.name || "a workspace"}” on ResearchGraph.`,
     note.trim() ? `“${note.trim()}”` : "",
-    `Sign in at ${origin}/login — the roster and exports live under Share.`,
+    `Sign in at ${origin}/login with this email address — the owner can add you to the roster under Share.`,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -514,6 +522,14 @@ export default function Collaboration() {
     const to = email.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
       toast("Enter a valid email address.");
+      return;
+    }
+    if (pending.some((i) => i.email.toLowerCase() === to.toLowerCase())) {
+      toast("That email is already on the invite list.");
+      return;
+    }
+    if (members.some((m) => users.find((u) => u.id === m.userId)?.email?.toLowerCase() === to.toLowerCase())) {
+      toast("That person is already in the workspace.");
       return;
     }
     invite(to, role);
@@ -587,7 +603,7 @@ export default function Collaboration() {
       return true;
     } catch (error) {
       const raw = error instanceof Error ? error.message : "";
-      const message = /20 MB|60 MB|Unsupported|verification|limit|authenticated/i.test(raw)
+      const message = /20 MB|60 MB|Unsupported|verification|limit|at most|cap|authenticated/i.test(raw)
         ? raw.split("\n")[0]
         : "Upload failed — check your connection and retry.";
       setPendingUploads((cur) =>
@@ -734,7 +750,7 @@ export default function Collaboration() {
           </h1>
           <p className="shx-hero-sub">
             Invite the people, attach your own handoff files, then build an export from what actually exists in the
-            workspace. Roles stay enforced; files and exports stay with the workspace.
+            workspace. Roles stay enforced; uploads stay in your account and exports stay in the browser.
           </p>
           <div className="shx-hero-actions">
             <button className="shx-btn lime" onClick={openPicker}>
@@ -815,7 +831,7 @@ export default function Collaboration() {
             <span className="shx-filestack" aria-hidden><i /><i /><i /></span>
           </div>
           <div className="shx-kpi-foot">
-            {attachments.length ? `${prettySize(totalUploadBytes)} · stored in workspace` : "Bring your own PDF, CSV, JSON…"}
+            {attachments.length ? `${prettySize(totalUploadBytes)} · stored in your account` : "Bring your own PDF, CSV, JSON…"}
           </div>
         </article>
       </section>
@@ -879,12 +895,12 @@ export default function Collaboration() {
               {UPLOAD_FORMATS.slice(0, 5).map((f) => <i key={f.kind}>{f.label}</i>)}
               <i>+4 more</i>
             </span>
-            <span className="shx-drop-privacy"><Ico name="shield" /> Encrypted in transit · stored in your workspace.</span>
+            <span className="shx-drop-privacy"><Ico name="shield" /> Stored in your account, not just this tab.</span>
           </label>
 
           <div className="shx-tray">
             <div className="shx-tray-head">
-              <span className="shx-kicker">Workspace files</span>
+              <span className="shx-kicker">Your files</span>
               <span className="shx-tray-count" aria-live="polite">{attachments.length + pendingUploads.length}</span>
               {attachments.length + pendingUploads.length > 0 && (
                 <label className="shx-file-search">
@@ -997,7 +1013,7 @@ export default function Collaboration() {
         <div className="shx-formats">
           <div className="shx-formats-head">
             <span className="shx-kicker">Accepted here</span>
-            <span>{prettySize(MAX_FILE_BYTES)} per file · {prettySize(MAX_TOTAL_BYTES)} per workspace</span>
+            <span>{prettySize(MAX_FILE_BYTES)} per file · {prettySize(MAX_TOTAL_BYTES)} per account</span>
           </div>
           <ul className="shx-format-grid">
             {UPLOAD_FORMATS.map((f) => (
@@ -1151,7 +1167,7 @@ export default function Collaboration() {
               </button>
             </div>
           </div>
-          <p className="shx-fine">Invitations are recorded in this workspace and emailed when delivery is configured. Attachments are stored with the workspace, not in this tab.</p>
+          <p className="shx-fine">Invitations are recorded in this workspace and emailed when delivery is configured. Attachments are stored in your account, not in this tab.</p>
         </motion.section>
 
         <motion.aside
@@ -1225,7 +1241,7 @@ export default function Collaboration() {
             </div>
             <button onClick={() => copy(`${origin}/login`, "link")}>{copied === "link" ? "✓" : "Copy"}</button>
           </div>
-          <p className="shx-fine">Exports are generated in the browser from workspace data. Attached files are stored with the workspace; the report lists their name, type and size.</p>
+          <p className="shx-fine">Exports are generated in the browser from workspace data. Attached files are stored in your account; the report lists their name, type and size.</p>
         </motion.aside>
       </div>
 
@@ -1305,8 +1321,14 @@ export default function Collaboration() {
               <button
                 className="shx-btn ghost"
                 onClick={() => void runBundle()}
-                disabled={bundling || !attachments.length}
-                title={attachments.length ? "ZIP the selected export with all stored files" : "Attach files first"}
+                disabled={bundling || !attachments.length || pendingUploads.some((p) => p.status === "uploading")}
+                title={
+                  pendingUploads.some((p) => p.status === "uploading")
+                    ? "Wait for the in-flight uploads to finish"
+                    : attachments.length
+                      ? "ZIP the selected export with all stored files"
+                      : "Attach files first"
+                }
               >
                 <Ico name="download" /> {bundling ? "Bundling…" : "Bundle .zip"}
               </button>

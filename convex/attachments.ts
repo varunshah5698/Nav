@@ -89,9 +89,9 @@ export const register = mutation({
       throw new Error("File is outside the 20 MB limit");
     }
 
-    // Never trust the client-declared size: verify the stored object.
-    const blob = await ctx.storage.get(args.storageId);
-    if (!blob || blob.size !== args.size) {
+    // Never trust the client-declared size: verify the stored object's metadata.
+    const metadata = await ctx.db.system.get("_storage", args.storageId);
+    if (!metadata || metadata.size !== args.size) {
       await ctx.storage.delete(args.storageId);
       throw new Error("Upload verification failed");
     }
@@ -104,12 +104,12 @@ export const register = mutation({
       .take(MAX_FILES + 1);
     if (existing.length >= MAX_FILES) {
       await ctx.storage.delete(args.storageId);
-      throw new Error(`A workspace can hold at most ${MAX_FILES} handoff files`);
+      throw new Error(`You can attach at most ${MAX_FILES} handoff files in a workspace`);
     }
     const total = existing.reduce((sum, row) => sum + row.size, 0);
     if (total + args.size > MAX_TOTAL_BYTES) {
       await ctx.storage.delete(args.storageId);
-      throw new Error("The 60 MB workspace attachment cap has been reached");
+      throw new Error("The 60 MB attachment cap for this workspace has been reached");
     }
 
     try {

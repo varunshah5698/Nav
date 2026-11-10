@@ -37,11 +37,11 @@ function inviteHtml(input: {
             <p style="margin:0 0 18px;font-size:18px;font-weight:800;letter-spacing:-0.02em;color:#2b2520;">ResearchGraph</p>
             <p style="margin:0 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#b93b18;font-weight:700;">Workspace invitation</p>
             <h1 style="margin:0 0 10px;font-size:26px;line-height:1.15;letter-spacing:-0.03em;color:#2b2520;">You're invited to ${esc(input.workspace)}</h1>
-            <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#7c7268;">${esc(input.inviter)} invited you to collaborate as <strong style="color:#2b2520;">${esc(input.role)}</strong>.</p>
+            <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#7c7268;">${esc(input.inviter)} recorded an invitation for you to collaborate as <strong style="color:#2b2520;">${esc(input.role)}</strong>. Sign in with this email address so the owner can add you to the roster.</p>
           </td></tr>
           ${note}
           <tr><td style="padding:0 32px 22px;">
-            <a href="${esc(input.link)}" style="display:inline-block;padding:12px 20px;border-radius:999px;background:#1e2222;color:#d8f85e;font-size:14px;font-weight:700;text-decoration:none;">Open ResearchGraph</a>
+            <a href="${esc(input.link)}" style="display:inline-block;padding:12px 20px;border-radius:999px;background:#1e2222;color:#d8f85e;font-size:14px;font-weight:700;text-decoration:none;">Sign in to ResearchGraph</a>
             <p style="margin:14px 0 0;font-size:12px;line-height:1.6;color:#a2978c;word-break:break-all;">${esc(input.link)}</p>
           </td></tr>
           <tr><td style="padding:0 32px 28px;">
@@ -62,9 +62,9 @@ function inviteText(input: {
   link: string;
 }) {
   return [
-    `${input.inviter} invited you to “${input.workspace}” on ResearchGraph as ${input.role}.`,
+    `${input.inviter} recorded an invitation for you to collaborate on “${input.workspace}” as ${input.role}.`,
     input.note ? `\n“${input.note}”\n` : "",
-    `Open the workspace: ${input.link}`,
+    `Sign in with this email address so the owner can add you to the roster: ${input.link}`,
     "",
     "If this wasn't for you, ignore the message.",
   ].join("\n");
