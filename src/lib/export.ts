@@ -1,13 +1,16 @@
 import type { Edge, Experiment, MemoryEntry, RNode, Source } from "./types";
 
-export function download(name: string, content: string, mime = "text/plain") {
-  const b = new Blob([content], { type: mime });
-  const u = URL.createObjectURL(b);
+export function downloadBlob(name: string, blob: Blob) {
+  const u = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = u;
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(u), 2000);
+}
+
+export function download(name: string, content: string, mime = "text/plain") {
+  downloadBlob(name, new Blob([content], { type: mime }));
 }
 
 export function bytesOf(content: string) {
@@ -68,7 +71,13 @@ export function expCSV(exps: Experiment[]) {
   return rows.join("\n");
 }
 
-export type ReportSection = "sources" | "graph" | "experiments" | "memory";
+export type ReportSection = "sources" | "graph" | "experiments" | "memory" | "files";
+
+export interface HandoffFile {
+  name: string;
+  ext: string;
+  bytes: number;
+}
 
 export interface ReportParts {
   nodes: RNode[];
@@ -76,15 +85,16 @@ export interface ReportParts {
   sources: Source[];
   exps: Experiment[];
   mems: MemoryEntry[];
+  files?: HandoffFile[];
 }
 
 export function workspaceReport(
   wsName: string,
   parts: ReportParts,
-  sections: ReportSection[] = ["sources", "graph", "experiments", "memory"],
+  sections: ReportSection[] = ["sources", "graph", "experiments", "memory", "files"],
 ) {
   const on = new Set(sections);
-  const { nodes, edges, sources, exps, mems } = parts;
+  const { nodes, edges, sources, exps, mems, files = [] } = parts;
   const runs = exps.reduce((a, e) => a + e.runs.length, 0);
   const out: string[] = [
     `# ${wsName} — Research Report`,
@@ -99,6 +109,7 @@ export function workspaceReport(
     `| Experiments | ${exps.length} |`,
     `| Runs | ${runs} |`,
     `| Memory entries | ${mems.length} |`,
+    `| Handoff files | ${files.length} |`,
     ``,
   ];
 

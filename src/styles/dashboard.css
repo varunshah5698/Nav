@@ -7,7 +7,7 @@
   --db-ink:#F3F1EA;--db-muted:#A8A69F;--db-dim:#8E8C85;
   --db-line:rgba(255,255,255,.09);--db-line-soft:rgba(255,255,255,.06);
   --db-orange:#F0805A;--db-orange-deep:#E26B43;--db-green:#6FD08C;
-  --db-glass:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.038));
+  --db-glass:linear-gradient(180deg,rgba(255,255,255,.048),rgba(255,255,255,.024));
   --db-shadow:0 22px 50px -30px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.07);
   position:relative;display:flex;flex-direction:column;gap:16px;padding:24px;border-radius:28px;
   background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);

@@ -162,11 +162,12 @@ label.lbl{font-size:12px;font-weight:700;color:var(--muted);display:block;margin
   --shadow-card:0 1px 2px rgba(0,0,0,.18),0 12px 30px -18px rgba(0,0,0,.55);
   --shadow-pop:0 20px 50px -20px rgba(0,0,0,.85);
   --font:"Manrope","Inter","Plus Jakarta Sans",-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-family:var(--font);
   background:
   radial-gradient(900px 480px at 82% -6%,rgba(243,112,63,.14),rgba(243,112,63,0) 62%),
   radial-gradient(760px 460px at 8% 12%,rgba(190,176,160,.09),rgba(190,176,160,0) 64%),
   radial-gradient(1000px 600px at 50% 110%,rgba(120,105,90,.08),rgba(120,105,90,0) 60%),
-  linear-gradient(158deg,#363330 0%,#292725 46%,#1C1A18 100%);
+  linear-gradient(158deg,#34312E 0%,#262422 46%,#1A1816 100%);
   color:#EDEBE6}
 .theme-dash .rg-top{background:rgba(51,48,44,.62);border-color:rgba(255,255,255,.1);box-shadow:0 24px 55px -30px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.08)}
 .theme-dash .rg-side{background:linear-gradient(180deg,rgba(45,42,38,.86),rgba(26,24,21,.72));border-color:rgba(255,255,255,.08);box-shadow:inset -1px 0 0 rgba(255,255,255,.04)}

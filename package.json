@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "npm run theme:check && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "theme:check": "node scripts/check-dark-theme.mjs"
   },
   "dependencies": {
     "@auth/core": "^0.41.1",

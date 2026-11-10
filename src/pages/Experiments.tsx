@@ -18,9 +18,9 @@ const STATUS: Record<ExpStatus, { label: string; tone: string }> = {
 };
 
 const STEPS = ["Plan", "Approve", "Run", "Compare"];
-const stepDone = (s: ExpStatus) => [s !== "draft", s === "approved" || s === "running" || s === "completed" || s === "failed", s === "completed" || s === "failed", false];
+const stepDone = (s: ExpStatus) => [s !== "draft", s === "approved" || s === "running" || s === "completed" || s === "failed", s === "completed" || s === "failed", s === "completed"];
 const stepActive = (s: ExpStatus, i: number) =>
-  (s === "draft" && i === 0) || ((s === "pending_approval" || s === "approved") && i === 1) || (s === "running" && i === 2) || ((s === "completed" || s === "failed") && i === 3);
+  !stepDone(s)[i] && ((s === "draft" && i === 0) || (s === "pending_approval" && i === 1) || ((s === "approved" || s === "running") && i === 2) || (s === "failed" && i === 3));
 
 const acc = (m: Record<string, number>) => (typeof m?.accuracy === "number" ? m.accuracy : null);
 const pct = (v: number | null) => (v === null ? "—" : `${(v * 100).toFixed(1)}%`);
@@ -67,7 +67,7 @@ function Spark({ values, tone = "orange", height = 42 }: { values: number[]; ton
         </linearGradient>
       </defs>
       <path className="area" d={area} fill={`url(#${id})`} />
-      <path className="line" d={line} />
+      <path className="line" pathLength={1} d={line} />
       {pts.slice(-1).map((p, i) => <circle key={i} className="tip" cx={p[0]} cy={p[1]} r="2.6" />)}
     </svg>
   );
@@ -313,7 +313,7 @@ export default function Experiments() {
                     <span><em>seed</em>{String(e.params.seed ?? "—")}</span>
                   </div>
 
-                  <div className="xh-steps" aria-label={`Pipeline: ${STEPS.join(" → ")}`} style={{ "--fill": `${stepDone(e.status).filter(Boolean).length * 33.33}%` } as CSSProperties}>
+                  <div className="xh-steps" aria-label={`Pipeline: ${STEPS.join(" → ")}`} style={{ "--fill": `${Math.min(3, stepDone(e.status).filter(Boolean).length) * 33.33}%` } as CSSProperties}>
                     {STEPS.map((s, i) => (
                       <span key={s} className={`xh-step${stepDone(e.status)[i] ? " done" : ""}${stepActive(e.status, i) ? " active" : ""}`}>
                         <i />{s}
@@ -470,7 +470,7 @@ function DetailSheet({ detail, running, onClose, onStatus, onRun, onSaveMemory }
             <Spark values={accs} height={86} tone={detail.status === "failed" ? "bad" : "orange"} />
           </div>
 
-          <div className="xh-steps big" style={{ "--fill": `${stepDone(detail.status).filter(Boolean).length * 33.33}%` } as CSSProperties}>
+          <div className="xh-steps big" style={{ "--fill": `${Math.min(3, stepDone(detail.status).filter(Boolean).length) * 33.33}%` } as CSSProperties}>
             {STEPS.map((s, i) => (
               <span key={s} className={`xh-step${stepDone(detail.status)[i] ? " done" : ""}${stepActive(detail.status, i) ? " active" : ""}`}><i />{s}</span>
             ))}
