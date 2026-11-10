@@ -60,7 +60,7 @@
 .dc-links{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:1}
 .dc-links line{stroke:rgba(240,128,90,.24);stroke-width:1;stroke-dasharray:2 4;vector-effect:non-scaling-stroke;animation:dcDash 9s linear infinite}
 .dc-links line:nth-child(2n){stroke:rgba(111,208,140,.16);animation-direction:reverse}
-.dc-ring{position:absolute;border-radius:50%;border:1px solid rgba(255,255,255,.22);transform:rotateX(64deg);pointer-events:none;
+.dc-ring{position:absolute;z-index:2;border-radius:50%;border:1px solid rgba(255,255,255,.22);transform:rotateX(64deg);pointer-events:none;
   box-shadow:0 0 18px rgba(255,255,255,.035)}
 .dc-ring::before{content:"";position:absolute;inset:-1px;border-radius:50%;border:1px solid transparent;
   border-top-color:rgba(255,255,255,.7);border-left-color:rgba(255,255,255,.18);filter:drop-shadow(0 0 5px rgba(255,255,255,.45))}

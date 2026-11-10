@@ -111,7 +111,7 @@ export default function Discovery() {
         <div className="dc-floor" />
         <div className="dc-orbit">
           <svg className="dc-links" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            {NODE_LINKS.map((p, i) => <line key={i} x1="50" y1="50" x2={p.x} y2={p.y} />)}
+            {NODE_LINKS.slice(0, Math.min(mix.length, NODE_LINKS.length)).map((p, i) => <line key={i} x1="50" y1="50" x2={p.x} y2={p.y} />)}
           </svg>
           <span className="dc-ring r1"><i /></span><span className="dc-ring r2"><i /></span><span className="dc-ring r3"><i /></span>
           <span className="dc-core">{navIcons.search}</span>
