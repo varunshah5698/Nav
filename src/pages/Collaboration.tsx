@@ -687,6 +687,10 @@ export default function Collaboration() {
 
   const clearFiles = async () => {
     if (!attachments.length && !pendingUploads.length) return;
+    if (pendingUploads.some((p) => p.status === "uploading")) {
+      toast("Wait for the in-flight uploads to finish, then clear.");
+      return;
+    }
     if (!window.confirm("Remove every attached file from this workspace? This cannot be undone.")) return;
     try {
       if (activeWs && attachments.length) await clearAttachments({ workspaceId: activeWs });
@@ -855,7 +859,13 @@ export default function Collaboration() {
                 {attachments.length} file{attachments.length === 1 ? "" : "s"} · {prettySize(totalUploadBytes)}
                 {pendingBytes > 0 && ` · ${prettySize(pendingBytes)} uploading`}
               </span>
-              <button onClick={() => void clearFiles()}>Clear all</button>
+              <button
+                onClick={() => void clearFiles()}
+                disabled={pendingUploads.some((p) => p.status === "uploading")}
+                title={pendingUploads.some((p) => p.status === "uploading") ? "Wait for uploads to finish" : "Remove all attached files"}
+              >
+                Clear all
+              </button>
             </div>
           )}
         </div>
