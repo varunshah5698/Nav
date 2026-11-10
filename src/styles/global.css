@@ -1,7 +1,17 @@
 @import "./tokens.css";
 .rg-app{min-height:100vh;background:var(--paper)}
 /* ---------- Shell ---------- */
-.rg-shell{min-height:100vh;background:var(--paper);display:flex;flex-direction:column}
+.rg-shell{min-height:100vh;background:var(--paper);display:flex}
+.rg-side{position:sticky;top:0;flex:none;width:236px;height:100vh;display:flex;flex-direction:column;gap:22px;padding:22px 14px 18px;border-right:1px solid var(--line);background:rgba(255,255,255,.55);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);overflow-y:auto}
+.rg-side .rg-brand{padding:0 8px}
+.rg-side .rg-nav{flex-direction:column;align-items:stretch;gap:2px;overflow:visible;flex:1}
+.rg-side .rg-nav a{padding:10px 12px;font-size:12.5px}
+.rg-side-foot{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line-soft);padding-top:14px}
+.rg-side-foot .rg-ws{max-width:none;width:100%}
+.rg-side-logout{border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 13px;font-family:inherit;font-size:11.5px;font-weight:650;color:var(--text);cursor:pointer}
+.rg-side-logout:hover{background:#F4F5F3}
+.rg-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.rg-top .rg-brand-top{display:none}
 .rg-top{position:sticky;top:10px;z-index:40;display:flex;align-items:center;gap:14px;height:60px;margin:10px 16px 0;padding:0 12px 0 14px;border-radius:20px;
   background:rgba(255,255,255,.74);border:1px solid rgba(30,34,34,.08);box-shadow:0 18px 40px -30px rgba(20,22,22,.5),inset 0 1px 0 #fff;
   backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2)}
@@ -125,6 +135,10 @@ label.lbl{font-size:12px;font-weight:700;color:var(--muted);display:block;margin
   linear-gradient(155deg,#252723 0%,#1B1D1A 46%,#131512 100%);
   color:#EDEBE6}
 .theme-dash .rg-top{background:rgba(40,42,38,.62);border-color:rgba(255,255,255,.1);box-shadow:0 24px 55px -30px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.08)}
+.theme-dash .rg-side{background:rgba(28,30,27,.6);border-color:rgba(255,255,255,.09)}
+.theme-dash .rg-side-foot{border-color:rgba(255,255,255,.08)}
+.theme-dash .rg-side-logout{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.1);color:#EDEAE2}
+.theme-dash .rg-side-logout:hover{background:rgba(255,255,255,.13)}
 .theme-dash .rg-brand-name{color:#F5F3EC}
 .theme-dash .rg-nav a{color:#C4C2BA}
 .theme-dash .rg-nav a:hover{background:rgba(255,255,255,.08);color:#fff}
@@ -164,10 +178,11 @@ label.lbl{font-size:12px;font-weight:700;color:var(--muted);display:block;margin
 .menubtn svg{width:17px;height:17px;display:block;color:#4B5151}
 
 /* ---------- responsive ---------- */
-@media(max-width:1440px){.rg-ws{display:none}}
-@media(max-width:1360px){.rg-nav a{padding:8px 5px;font-size:11px}.rg-searchbox{width:190px;padding:8px 11px}}
+@media(max-width:1360px){.rg-searchbox{width:190px;padding:8px 11px}}
 @media(max-width:1180px){.rg-grid.kpi{grid-template-columns:repeat(3,minmax(0,1fr))}.rg-grid.c3{grid-template-columns:1fr 1fr}}
 @media(max-width:1120px){
+  .rg-side{display:none}
+  .rg-top .rg-brand-top{display:flex}
   .rg-nav{display:none}
   .rg-mobile-nav{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin:8px 16px 0;padding:9px;background:rgba(255,255,255,.9);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow-pop);backdrop-filter:blur(18px)}
   .rg-mobile-nav a{display:flex;align-items:center;gap:6px;padding:10px 11px;border-radius:10px;text-decoration:none;color:#5E6461;font-size:12.5px;font-weight:600}
