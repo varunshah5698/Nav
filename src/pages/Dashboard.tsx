@@ -2,14 +2,15 @@ import { Link } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { useStore } from "../lib/store";
 import { Badge, Empty, Modal } from "../components/ui";
-import { Donut, Gauge, Growth, RankBars, Spark } from "../components/Charts";
+import { Donut, Growth, RankBars, RunBars } from "../components/Charts";
 import { approvalRate, describe, graphMetrics, median, pct } from "../lib/analytics";
-import type { Activity, AgentName } from "../lib/types";
+import type { Activity, AgentName, SourceKind } from "../lib/types";
 import "../styles/dashboard.css";
 
 const TYPE_LABEL:Record<string,string>={paper:"Papers",dataset:"Datasets",code_repo:"Code repos",code_file:"Code files",note:"Notes",webpage:"Web pages",question:"Questions",experiment:"Experiments",result:"Results",error:"Errors",fix:"Fixes",conclusion:"Conclusions"};
 const KIND_LABEL:Record<string,string>={pdf:"PDF papers",url:"Web pages",github:"Repositories",dataset:"Datasets",note:"Notes"};
 const AGENT_LABEL:Record<AgentName,string>={controller:"Controller",paper_reader:"Paper Reader",equation:"Equation Solver",code_setup:"Code Setup",experiment:"Experiment",benchmark:"Benchmark",memory:"Memory",review:"Review"};
+const MIX=["#6FD08C","#F0805A","#E8DFD0","#8B8F87","#C9A9F5","#7AA2FF"];
 const num=(v:number)=>v.toLocaleString("en-GB");
 const statusTone=(s:string)=>s==="completed"?"green":s==="failed"?"red":s==="waiting_approval"?"yellow":s==="running"?"violet":"";
 const rel=(iso:string)=>{
@@ -21,33 +22,41 @@ const rel=(iso:string)=>{
   return d<30 ? d+"d ago" : new Date(iso).toLocaleDateString("en-GB",{day:"numeric",month:"short"});
 };
 
-const I={
-  sources:<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 2.5h5L14.5 7v8a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1Z"/><path d="M10 2.5V7h4.5"/><path d="M6.6 10.6h4.8M6.6 13h3.2"/></svg>,
-  edges:<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="4.4" cy="9" r="2.1"/><circle cx="13.6" cy="4.4" r="2.1"/><circle cx="13.6" cy="13.6" r="2.1"/><path d="M6.3 8 11.9 5.2M6.3 10l5.6 2.8"/></svg>,
-  runs:<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 2.5h4M8 2.5v4.4L4.7 12.8a1.8 1.8 0 0 0 1.6 2.7h5.4a1.8 1.8 0 0 0 1.6-2.7L10 6.9V2.5"/><path d="M6.2 11.2h5.6"/></svg>,
-  rate:<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="9" r="6.4"/><path d="m6 9.2 2.1 2.1L12.2 7"/></svg>,
+const KIND_ICON:Record<SourceKind,React.ReactNode>={
+  pdf:<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 2.5h5L14.5 7v8a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1Z"/><path d="M10 2.5V7h4.5"/><path d="M6.6 10.6h4.8M6.6 13h3.2"/></svg>,
+  url:<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="9" r="6.2"/><path d="M2.8 9h12.4M9 2.8c1.8 1.7 2.8 3.8 2.8 6.2S10.8 13.5 9 15.2C7.2 13.5 6.2 11.4 6.2 9S7.2 4.5 9 2.8Z"/></svg>,
+  github:<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m7 5-4 4 4 4M11 5l4 4-4 4"/></svg>,
+  dataset:<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="9" cy="4.6" rx="5.2" ry="2.1"/><path d="M3.8 4.6v8.8c0 1.2 2.3 2.1 5.2 2.1s5.2-.9 5.2-2.1V4.6"/><path d="M3.8 9c0 1.2 2.3 2.1 5.2 2.1s5.2-.9 5.2-2.1"/></svg>,
+  note:<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 3h10v8l-4 4H4Z"/><path d="M10 15v-4h4"/><path d="M6.5 6.5h5M6.5 9h3.2"/></svg>,
 };
 
-function Panel({title,sub,action,children,dark}:{title:string;sub?:string;action?:React.ReactNode;children:React.ReactNode;dark?:boolean}){
-  return <section className={`db-panel${dark?" dark":""}`}>
+function Delta({children,tone="up"}:{children:React.ReactNode;tone?:"up"|"down"|"warn"|"zero"}){
+  return <span className={`db-delta ${tone}`}>
+    {tone==="up"&&<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M2.6 8.6 6 5.2l3.4 3.4"/><path d="M6 5.4v5"/></svg>}
+    {tone==="down"&&<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M2.6 3.4 6 6.8l3.4-3.4"/><path d="M6 6.6v5"/></svg>}
+    {children}
+  </span>;
+}
+
+function Panel({id,title,sub,action,children}:{id?:string;title:string;sub?:string;action?:React.ReactNode;children:React.ReactNode}){
+  return <section className="db-panel" id={id}>
     <div className="db-p-head"><div><h2>{title}</h2>{sub&&<p>{sub}</p>}</div>{action&&<div className="db-p-act">{action}</div>}</div>
     {children}
   </section>;
 }
 
-function KpiCard({icon,label,value,suffix,foot,spark,meter,tone}:{icon:React.ReactNode;label:string;value:string;suffix?:string;foot:React.ReactNode;spark?:number[];meter?:number;tone?:"lime"|"violet"|"ink"}){
-  return <article className={`db-kpi${tone?" t-"+tone:""}`}>
-    <div className="db-kpi-top"><span className="db-kpi-ic">{icon}</span><span className="db-kpi-lbl">{label}</span></div>
-    <div className="db-kpi-val"><b>{value}{suffix&&<small>{suffix}</small>}</b>
-      {spark&&spark.some(v=>v>0)?<Spark data={spark} tone={tone}/>:meter!==undefined&&meter>0?<span className="db-meter" aria-hidden="true"><i style={{width:Math.max(2,Math.min(100,meter))+"%"}}/></span>:null}
-    </div>
-    <div className="db-kpi-foot">{foot}</div>
+function Kpi({label,value,delta,tone}:{label:string;value:string;delta:string;tone:"up"|"down"|"warn"|"zero"}){
+  return <article className="db-kpi">
+    <span className="db-kpi-lbl">{label}</span>
+    <div className="db-kpi-row"><b>{value}</b><Delta tone={tone}>{delta}</Delta></div>
   </article>;
 }
 
 export default function Dashboard(){
   const activeWs=useStore(s=>s.activeWs);
   const ws=useStore(s=>s.workspaces.find(w=>w.id===s.activeWs));
+  const user=useStore(s=>s.users.find(u=>u.id===s.sessionUserId));
+  const memberships=useStore(s=>s.memberships);
   const createWs=useStore(s=>s.createWorkspace);
   const allNodes=useStore(s=>s.nodes); const nodes=useMemo(()=>allNodes.filter(n=>n.workspaceId===activeWs),[allNodes,activeWs]);
   const allEdges=useStore(s=>s.edges); const edges=useMemo(()=>allEdges.filter(n=>n.workspaceId===activeWs),[allEdges,activeWs]);
@@ -56,6 +65,7 @@ export default function Dashboard(){
   const allAgents=useStore(s=>s.agents); const agents=useMemo(()=>allAgents.filter(n=>n.workspaceId===activeWs),[allAgents,activeWs]);
   const allActs=useStore(s=>s.activities); const acts=useMemo(()=>allActs.filter(n=>n.workspaceId===activeWs).sort((a,b)=>+new Date(b.createdAt)-+new Date(a.createdAt)),[allActs,activeWs]);
   const [range,setRange]=useState("7d");
+  const [tab,setTab]=useState("overview");
   const [open,setOpen]=useState(false);
   const [draft,setDraft]=useState({name:"",desc:""});
 
@@ -66,6 +76,7 @@ export default function Dashboard(){
 
   const runs=useMemo(()=>exps.flatMap(e=>e.runs),[exps]);
   const gm=useMemo(()=>graphMetrics(nodes,edges),[nodes,edges]);
+  const memberCount=memberships.filter(m=>m.workspaceId===activeWs).length;
 
   /* --- time series: additions per bucket + cumulative corpus --- */
   const series=useMemo(()=>{
@@ -96,6 +107,7 @@ export default function Dashboard(){
   const successRate=finished.length?pct(okRuns,finished.length):0;
   const readySources=sources.filter(s=>s.status==="ready").length;
   const newSources=sources.filter(s=>inRange(s.createdAt)).length;
+  const edgeAdded=edges.filter(e=>inRange(e.createdAt)).length;
   const totalItems=nodes.length+sources.length;
   const addedInRange=series.reduce((a,b)=>a+b.added,0);
   const peak=series.reduce((a,b)=>b.added>a.added?b:a, series[0]||{label:"—",added:0});
@@ -120,6 +132,15 @@ export default function Dashboard(){
     sources.forEach(s=>m.set(KIND_LABEL[s.kind]||s.kind,(m.get(KIND_LABEL[s.kind]||s.kind)||0)+1));
     return [...m.entries()].map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
   },[sources]);
+
+  const runBars=useMemo(()=>runs
+    .filter(r=>typeof r.metrics?.accuracy==="number")
+    .map((r,i)=>({
+      label:String(r.params?.model??`Run ${i+1}`).replace("mobilenet_v2","MobileNetV2").replace("efficientnet_lite0","EfficientNet-Lite0"),
+      value:+(((r.metrics?.accuracy)??0)*100).toFixed(1),
+    })).slice(-6),[runs]);
+
+  const sourceList=useMemo(()=>[...sources].sort((a,b)=>+new Date(b.createdAt)-+new Date(a.createdAt)).slice(0,6),[sources]);
 
   /* --- descriptive statistics for run metrics --- */
   const metricRows=useMemo(()=>{
@@ -163,35 +184,135 @@ export default function Dashboard(){
 
   const canvasTo="/app/canvas"+(ws?`?ws=${ws.id}`:"");
   const create=()=>{ if(!draft.name.trim()) return; createWs(draft.name.trim(),draft.desc.trim()); setDraft({name:"",desc:""}); setOpen(false); };
+  const initials=(user?.name||"R").split(/\s+/).map(p=>p[0]).slice(0,2).join("").toUpperCase();
+  const joinDate=new Date(user?.createdAt||ws?.createdAt||Date.now()).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+  const successTone=finished.length?(successRate>=80?"up":"warn"):"zero";
+  const jump=(id:string,key:string)=>{
+    setTab(key);
+    const el=document.getElementById(id);
+    const reduce=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el?.scrollIntoView({behavior:reduce?"auto":"smooth",block:"start"});
+  };
 
-  return <div className="db">
+  return <div className="db" id="db-overview">
     <header className="db-head">
-      <div>
-        <div className="db-eyebrow"><span>{ws?.name||"Workspace"}</span>{ws?.demo&&<><i className="sep"/><span>Demo data</span></>}</div>
-        <h1 className="db-h1">Research dashboard</h1>
-        <p className="db-sub">Corpus, knowledge graph and experiment statistics for the last {days} days.</p>
-      </div>
-      <div className="db-actions">
-        <div className="db-seg" role="group" aria-label="Time range">
-          {[["7d","7 days"],["30d","30 days"],["90d","90 days"]].map(([k,l])=>
-            <button key={k} className={range===k?"on":""} aria-pressed={range===k} onClick={()=>setRange(k)}>{l}</button>)}
+      <div className="db-head-top">
+        <div>
+          <div className="db-eyebrow"><span>{ws?.name||"Workspace"}</span>{ws?.demo&&<><i className="sep"/><span>Demo data</span></>}</div>
+          <h1 className="db-h1">Research cabinet</h1>
         </div>
-        <Link className="btn btn-ghost btn-sm" to="/app/analyst">✧ Ask the analyst</Link>
-        <button className="btn btn-ghost btn-sm" onClick={()=>setOpen(true)}>+ Workspace</button>
-        <Link className="btn btn-primary btn-sm" to={canvasTo}>Open canvas</Link>
+        <div className="db-head-actions">
+          <nav className="db-tabs" aria-label="Dashboard sections">
+            {[["overview","db-overview","My cabinet"],["corpus","db-corpus","Corpus"],["statistics","db-statistics","Statistics"]].map(([key,id,label])=>
+              <button key={key} className={tab===key?"on":""} aria-pressed={tab===key} onClick={()=>jump(id,key)}>{label}</button>)}
+          </nav>
+          <button className="db-ghost" onClick={()=>setOpen(true)}>+ Workspace</button>
+        </div>
       </div>
+      <p className="db-sub">Corpus, knowledge graph and experiment statistics for the last {days} days.</p>
     </header>
 
-    <section className="db-kpis" aria-label="Headline metrics">
-      <KpiCard icon={I.sources} label="Sources indexed" value={num(sources.length)} spark={series.map(s=>s.srcTotal)} tone="violet"
-        foot={<><span><b>+{newSources}</b> in range</span><span>·</span><span>{ingestDone.length?`${ingestRate}% ready`:"no ingest yet"}</span></>}/>
-      <KpiCard icon={I.edges} label="Knowledge connections" value={num(edges.length)} spark={series.map(s=>s.edgeTotal)} tone="ink"
-        foot={<><span>density <b>{gm.density.toFixed(2)}</b></span><span>·</span><span>{gm.avgDegree.toFixed(1)} links / node</span></>}/>
-      <KpiCard icon={I.runs} label="Experiment runs" value={num(runs.length)} spark={series.map(s=>s.runTotal)} tone="lime"
-        foot={<><span><b>{okRuns}</b> completed</span><span>·</span><span>{failedRuns} failed</span></>}/>
-      <KpiCard icon={I.rate} label="Run success rate" value={finished.length?String(successRate):"—"} suffix={finished.length?"%":undefined} meter={finished.length?successRate:0} tone="lime"
-        foot={<><span>{okRuns} of {finished.length} finished runs</span></>}/>
-    </section>
+    <div className="db-layout">
+      <div className="db-main">
+        <section className="db-kpis" aria-label="Headline metrics">
+          <Kpi label="Sources indexed" value={num(sources.length)} delta={`+${newSources} in range`} tone={newSources?"up":"zero"}/>
+          <Kpi label="Knowledge connections" value={num(edges.length)} delta={`+${edgeAdded} in range`} tone={edgeAdded?"up":"zero"}/>
+          <Kpi label="Experiment runs" value={num(runs.length)} delta={finished.length?`${successRate}% passed`:"no runs"} tone={successTone}/>
+          <Kpi label="Corpus items" value={num(totalItems)} delta={`+${addedInRange} in range`} tone={addedInRange?"up":"zero"}/>
+        </section>
+
+        <div className="db-pair">
+          <Panel title="Run accuracy" sub="Validation accuracy across finished runs" action={<Link className="db-link" to="/app/experiments">Lab</Link>}>
+            {runBars.length? <>
+              <RunBars data={runBars}/>
+              <div className="db-footrow">
+                <span>Best <b>{Math.max(...runBars.map(r=>r.value)).toFixed(1)}%</b></span>
+                <span>Mean <b>{(runBars.reduce((a,b)=>a+b.value,0)/runBars.length).toFixed(1)}%</b></span>
+                <span><b>{runBars.length}</b> run{runBars.length===1?"":"s"}</span>
+              </div>
+            </>:<Empty title="No run metrics" body="Approve a plan and execute it to collect accuracy, F1 and loss." action={<Link className="btn btn-primary btn-sm" to="/app/experiments">Open lab</Link>}/>}
+          </Panel>
+
+          <Panel title="Source mix" sub={`${sources.length} sources · ${chunks} chunks indexed`} action={<Link className="db-link" to="/app/sources">Sources</Link>}>
+            {sources.length? <>
+              <div className="db-mix">
+                <Donut data={byKind} height={196} center={{value:String(sources.length),label:"sources"}}/>
+                <div className="db-legend-list">
+                  {byKind.map((k,i)=><div key={k.name}>
+                    <i style={{background:MIX[i%MIX.length]}}/>
+                    <span className="nm">{k.name}</span>
+                    <b>{k.value}</b>
+                    <em>{Math.round(k.value/Math.max(sources.length,1)*100)}%</em>
+                  </div>)}
+                </div>
+              </div>
+              <div className="db-footrow"><span>Median ingest <b>{ingestMs?Math.round(ingestMs/1000)+"s":"—"}</b></span><span>Ready <b>{readySources}/{sources.length}</b></span></div>
+            </>:<Empty title="No sources" body="Upload a PDF, URL or dataset to start ingestion."/>}
+          </Panel>
+        </div>
+
+        <Panel title="Knowledge growth" sub={`New sources and nodes per ${days>30?"week":"day"}, against the cumulative corpus`}
+          action={<>
+            <div className="db-seg" role="group" aria-label="Time range">
+              {[["7d","7 days"],["30d","30 days"],["90d","90 days"]].map(([k,l])=>
+                <button key={k} className={range===k?"on":""} aria-pressed={range===k} onClick={()=>setRange(k)}>{l}</button>)}
+            </div>
+            <Link className="db-link" to={canvasTo}>Canvas</Link>
+            <Link className="db-cta" to="/app/sources">+ Add source</Link>
+          </>}>
+          {totalItems? <>
+            <Growth data={series}/>
+            <div className="db-footrow">
+              <span>Peak day <b>{peak.label}</b> · {peak.added} items</span>
+              <span><b>{avgPerDay}</b> items / day avg</span>
+              <span>Corpus <b>{num(totalItems)}</b> items</span>
+            </div>
+          </> : <Empty title="Nothing indexed yet" body="Add your first source or draw a node — the analysis fills in automatically." action={<Link className="btn btn-primary btn-sm" to="/app/sources">Add a source</Link>}/>}
+        </Panel>
+      </div>
+
+      <aside className="db-rail" aria-label="Account and sources">
+        <section className="db-profile">
+          <div className="db-profile-top">
+            <span className="db-avatar">{initials}</span>
+            <div>
+              <b>{user?.name||"Researcher"}</b>
+              <span><i className="db-star" aria-hidden>★</i> {ws?.demo?"Demo workspace":"Owner"} · {memberCount} member{memberCount===1?"":"s"}</span>
+            </div>
+          </div>
+          <dl className="db-info">
+            <div><dt>Email</dt><dd title={user?.email}>{user?.email||"—"}</dd></div>
+            <div><dt>Workspace</dt><dd title={ws?.name}>{ws?.name||"—"}</dd></div>
+            <div><dt>Joined</dt><dd>{joinDate}</dd></div>
+            <div><dt>Corpus items</dt><dd className="db-info-total">{num(totalItems)} <Delta tone={addedInRange?"up":"zero"}>+{addedInRange}</Delta></dd></div>
+          </dl>
+          <div className="db-health">
+            <div><span>Graph health</span><b>{gm.rate}% linked</b></div>
+            <div className="db-health-bar" aria-hidden><i style={{width:Math.min(100,gm.rate)+"%"}}/></div>
+          </div>
+        </section>
+
+        <section className="db-panel db-props" aria-label="My sources">
+          <div className="db-p-head">
+            <div><h2>My sources</h2><p>{sources.length} in this workspace</p></div>
+            <div className="db-p-act"><Link className="db-cta db-cta-sm" to="/app/sources">+ Add source</Link></div>
+          </div>
+          {sourceList.length? <div className="db-prop-list">
+            {sourceList.map(s=>{
+              const tone=s.status==="ready"?"up":s.status==="failed"?"down":s.status==="processing"?"warn":"zero";
+              return <Link className="db-prop" key={s.id} to="/app/sources">
+                <span className={`db-prop-ic k-${s.kind}`}>{KIND_ICON[s.kind]}</span>
+                <div className="db-prop-main">
+                  <b title={s.title}>{s.title}</b>
+                  <Delta tone={tone}>{s.status==="ready"?"ready":s.status.replace("_"," ")}</Delta>
+                </div>
+                <div className="db-prop-val"><b>{s.chunks?.length??0}</b><span>chunks{s.durationMs?` · ${(s.durationMs/1000).toFixed(1)}s`:""}</span></div>
+              </Link>;
+            })}
+          </div> : <Empty title="No sources yet" body="Upload a PDF, URL or dataset to start."/>}
+        </section>
+      </aside>
+    </div>
 
     <section className="db-ribbon" aria-label="Corpus and workflow quality signals">
       <div><span>Metadata completeness</span><b>{nodes.length?completeness+"%":"—"}</b></div>
@@ -201,52 +322,15 @@ export default function Dashboard(){
       <div><span>Graph clusters</span><b>{nodes.length?gm.components:"—"}</b></div>
     </section>
 
-    <section className="db-row g21">
-      <Panel title="Knowledge growth" sub={`New sources and nodes per ${days>30?"week":"day"}, against the cumulative corpus`}
-        action={<span className="db-legend"><i className="bar"/>Added<i className="area"/>Cumulative</span>}>
-        {totalItems? <>
-          <Growth data={series}/>
-          <div className="db-footrow">
-            <span>Peak day <b>{peak.label}</b> · {peak.added} items</span>
-            <span><b>{avgPerDay}</b> items / day avg</span>
-            <span>Corpus <b>{num(totalItems)}</b> items</span>
-          </div>
-        </> : <Empty title="Nothing indexed yet" body="Add your first source or draw a node — the analysis fills in automatically." action={<Link className="btn btn-primary btn-sm" to="/app/sources">Add a source</Link>}/>}
-      </Panel>
-
-      <Panel dark title="Graph health" sub="How connected the evidence in this workspace is">
-        <div className="db-gauge-wrap"><Gauge value={gm.rate} label="nodes linked"/></div>
-        <div className="db-mini">
-          <div><span>Nodes</span><b>{nodes.length}</b></div>
-          <div><span>Edges</span><b>{edges.length}</b></div>
-          <div><span>Avg degree</span><b>{gm.avgDegree.toFixed(1)}</b></div>
-          <div><span>Isolated</span><b>{gm.isolated.length}</b></div>
-        </div>
-        <div className="db-footrow"><span>Density <b>{gm.density.toFixed(2)}</b></span><span>Max degree <b>{gm.maxDegree}</b></span><span><b>{gm.components}</b> cluster{gm.components===1?"":"s"}</span></div>
-      </Panel>
-    </section>
-
     <section className="db-row g3">
-      <Panel title="Corpus composition" sub={`${nodes.length} nodes across ${byType.length} types`} action={<Link className="db-link" to={canvasTo}>Canvas</Link>}>
+      <Panel id="db-corpus" title="Corpus composition" sub={`${nodes.length} nodes across ${byType.length} types`} action={<Link className="db-link" to={canvasTo}>Canvas</Link>}>
         {byType.length? <>
           <RankBars items={byType}/>
           <p className="db-note"><b>{byType[0].name}</b> lead the graph at {Math.round(byType[0].value/Math.max(nodes.length,1)*100)}% of all nodes.</p>
         </>:<Empty title="Empty graph" body="Create nodes on the canvas to see the composition."/>}
       </Panel>
 
-      <Panel title="Source pipeline" sub={`${sources.length} sources · ${chunks} chunks indexed`} action={<Link className="db-link" to="/app/sources">Sources</Link>}>
-        {sources.length? <>
-          <div className="db-pipe">
-            <Donut data={byKind} height={168} center={{value:String(sources.length),label:"sources"}}/>
-            <div className="db-legend-list">
-              {byKind.map((k,i)=><div key={k.name}><i style={{background:["#9C8BE5","#1E2222","#C6E838","#7AA2FF"][i%4]}}/>{k.name}<b>{k.value}</b></div>)}
-            </div>
-          </div>
-          <div className="db-footrow"><span>Median ingest <b>{ingestMs?Math.round(ingestMs/1000)+"s":"—"}</b></span><span>Ready <b>{readySources}/{sources.length}</b></span></div>
-        </>:<Empty title="No sources" body="Upload a PDF, URL or dataset to start ingestion."/>}
-      </Panel>
-
-      <Panel title="Run statistics" sub={runs.length?`Descriptive summary across ${runs.length} run${runs.length>1?"s":""}`:"No measurements yet"}>
+      <Panel id="db-statistics" title="Run statistics" sub={runs.length?`Descriptive summary across ${runs.length} run${runs.length>1?"s":""}`:"No measurements yet"}>
         {metricRows.length? <>
           <table className="db-tbl">
             <thead><tr><th>Metric</th><th>n</th><th>Mean</th><th>Median</th><th>SD</th><th>Range</th></tr></thead>
@@ -255,20 +339,18 @@ export default function Dashboard(){
           <p className="db-note">SD is the sample standard deviation (n−1) — a small SD means the run is reproducible, not just good.</p>
         </>:<Empty title="No run metrics" body="Approve a plan and execute it to collect accuracy, F1 and loss." action={<Link className="btn btn-primary btn-sm" to="/app/experiments">Open lab</Link>}/>}
       </Panel>
-    </section>
 
-    <section className="db-row g3">
       <Panel title="Agent workload" sub={agents.length?`${agents.length} tasks · ${ap.total?ap.rate+"% approved":"no approvals yet"}`:"No agent tasks yet"} action={<Link className="db-link" to="/app/agents">Control center</Link>}>
         {agents.length? <>
           <div className="db-statusbar" role="img" aria-label="Agent tasks by status">
-            {statusCounts.completed>0&&<i style={{flex:statusCounts.completed,background:"#2E9E5B"}}/>}
-            {statusCounts.running>0&&<i style={{flex:statusCounts.running,background:"#9C8BE5"}}/>}
-            {statusCounts.waiting_approval>0&&<i style={{flex:statusCounts.waiting_approval,background:"#E8C400"}}/>}
-            {statusCounts.failed>0&&<i style={{flex:statusCounts.failed,background:"#D64545"}}/>}
-            {statusCounts.other>0&&<i style={{flex:statusCounts.other,background:"#C9CDCD"}}/>}
+            {statusCounts.completed>0&&<i style={{flex:statusCounts.completed,background:"#6FD08C"}}/>}
+            {statusCounts.running>0&&<i style={{flex:statusCounts.running,background:"#E8DFD0"}}/>}
+            {statusCounts.waiting_approval>0&&<i style={{flex:statusCounts.waiting_approval,background:"#F0C85A"}}/>}
+            {statusCounts.failed>0&&<i style={{flex:statusCounts.failed,background:"#E07A6A"}}/>}
+            {statusCounts.other>0&&<i style={{flex:statusCounts.other,background:"#6B6F67"}}/>}
           </div>
           <div className="db-sb-legend">
-            {[["completed","Completed","#2E9E5B"],["running","Running","#9C8BE5"],["waiting_approval","Awaiting approval","#E8C400"],["failed","Failed","#D64545"]].map(([k,l,c])=>
+            {[["completed","Completed","#6FD08C"],["running","Running","#E8DFD0"],["waiting_approval","Awaiting approval","#F0C85A"],["failed","Failed","#E07A6A"]].map(([k,l,c])=>
               statusCounts[k as keyof typeof statusCounts]?<span key={k}><i style={{background:c}}/>{l} {statusCounts[k as keyof typeof statusCounts]}</span>:null)}
           </div>
           <div className="db-agents">
@@ -281,7 +363,9 @@ export default function Dashboard(){
           <div className="db-footrow"><span>Mean confidence <b>{conf?conf.mean.toFixed(2):"—"}</b></span><span>Approved <b>{ap.approved}/{ap.total}</b></span></div>
         </>:<Empty title="No agent tasks" body="Ask Paper Reader to analyze your first paper."/>}
       </Panel>
+    </section>
 
+    <section className="db-row g2">
       <Panel title="Needs attention" sub="Derived from graph gaps, failures and pending reviews">
         {attention.length? <div className="db-attn">
           {attention.map(a=><Link key={a.label} className={`db-attn-item ${a.tone}`} to={a.to}>

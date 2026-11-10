@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../lib/store";
 import { Empty } from "../components/ui";
+import { Donut } from "../components/Charts";
 import { median, pct, srcSuccess } from "../lib/analytics";
 import { titleFromFilename } from "../lib/text";
 import type { ParsedPdf } from "../lib/pdf";
@@ -17,6 +18,7 @@ const STATE:Record<Source["status"],{label:string;tone:string}>={
   queued:{label:"Queued",tone:"warn"},
   failed:{label:"Failed",tone:"bad"},
 };
+const KIND_COLOR:Record<SourceKind,string>={pdf:"#F0B49C",url:"#A9C6FF",github:"#CBBDF5",dataset:"#A8E7B8",note:"#E8DFD0"};
 
 type DraftSource=Omit<Source,"id"|"createdAt"|"progress"|"status"|"workspaceId"> & {fileText?:string};
 
@@ -62,6 +64,14 @@ const S={
   upload:<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 11.5V3.2M6 6.1 9 3.2l3 2.9"/><path d="M3.4 11.4v2.4a1 1 0 0 0 1 1h9.2a1 1 0 0 0 1-1v-2.4"/></svg>,
 };
 
+function Delta({tone="zero",children}:{tone?:"up"|"down"|"warn"|"zero";children:React.ReactNode}){
+  return <span className={`src-delta ${tone}`}>
+    {tone==="up"&&<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M2.6 8.6 6 5.2l3.4 3.4"/><path d="M6 5.4v5"/></svg>}
+    {tone==="down"&&<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M2.6 3.4 6 6.8l3.4-3.4"/><path d="M6 6.6v5"/></svg>}
+    {children}
+  </span>;
+}
+
 function useDialog(onClose:()=>void){
   useEffect(()=>{
     const onKey=(e:KeyboardEvent)=>{ if(e.key==="Escape") onClose(); };
@@ -75,11 +85,15 @@ function useDialog(onClose:()=>void){
 export default function Sources(){
   const activeWs=useStore(s=>s.activeWs);
   const ws=useStore(s=>s.workspaces.find(w=>w.id===s.activeWs));
+  const user=useStore(s=>s.users.find(u=>u.id===s.sessionUserId));
+  const me=useStore(s=>s.sessionUserId);
+  const memberships=useStore(s=>s.memberships);
   const allSources=useStore(s=>s.sources);
   const sources=useMemo(()=>allSources.filter(x=>x.workspaceId===activeWs),[allSources,activeWs]);
   const add=useStore(s=>s.addSource);
 
   const [kind,setKind]=useState<"all"|SourceKind>("all");
+  const [status,setStatus]=useState<"all"|"ready"|"pipeline">("all");
   const [q,setQ]=useState("");
   const [open,setOpen]=useState(false);
   const [sel,setSel]=useState<string|null>(null);
@@ -87,11 +101,13 @@ export default function Sources(){
 
   const term=q.trim().toLowerCase();
   const filtered=useMemo(()=>sources.filter(s=>{
+    if(status==="ready"&&s.status!=="ready") return false;
+    if(status==="pipeline"&&s.status!=="queued"&&s.status!=="processing") return false;
     if(kind!=="all"&&s.kind!==kind) return false;
     if(!term) return true;
     const haystack=s.title+" "+(s.authors||"")+" "+(s.abstract||"")+" "+s.tags.join(" ")+" "+(s.chunks?.map(c=>c.text).join(" ")||"");
     return haystack.toLowerCase().includes(term);
-  }).sort((a,b)=>+new Date(b.createdAt)-+new Date(a.createdAt)),[sources,kind,term]);
+  }).sort((a,b)=>+new Date(b.createdAt)-+new Date(a.createdAt)),[sources,status,kind,term]);
   const detail=sources.find(x=>x.id===sel);
 
   const kinds=useMemo(()=>{
@@ -99,6 +115,7 @@ export default function Sources(){
     sources.forEach(s=>m.set(s.kind,(m.get(s.kind)||0)+1));
     return m;
   },[sources]);
+  const byKind=useMemo(()=>KIND_ORDER.map(k=>({kind:k,name:KIND_NOUN[k],value:kinds.get(k)||0})).filter(k=>k.value>0),[kinds]);
 
   const success=srcSuccess(sources);
   const passages=sources.reduce((a,s)=>a+(s.chunks?.length||0),0);
@@ -107,123 +124,222 @@ export default function Sources(){
   const newThisWeek=sources.filter(s=>+new Date(s.createdAt)>Date.now()-7*864e5).length;
   const ingestMs=median(sources.map(s=>s.durationMs||0).filter(v=>v>0));
   const inFlight=sources.filter(s=>s.status==="queued"||s.status==="processing").length;
+  const ready=sources.filter(s=>s.status==="ready").length;
   const failed=success.total-success.ok;
   const linkedRate=sources.length?pct(linked,sources.length):0;
 
+  const intake=useMemo(()=>sources.filter(s=>s.durationMs).sort((a,b)=>+new Date(a.createdAt)-+new Date(b.createdAt)).slice(-6),[sources]);
+  const intakeMax=Math.max(...intake.map(s=>s.durationMs||0),1);
+  const intakeFast=Math.min(...intake.map(s=>s.durationMs||0));
+  const intakeSlow=Math.max(...intake.map(s=>s.durationMs||0));
+
+  const recent=useMemo(()=>[...sources].sort((a,b)=>+new Date(b.createdAt)-+new Date(a.createdAt)).slice(0,6),[sources]);
+  const memberCount=memberships.filter(m=>m.workspaceId===activeWs).length;
+  const role=memberships.find(m=>m.workspaceId===activeWs&&m.userId===me)?.role;
+  const initials=(user?.name||"R").split(/\s+/).map(p=>p[0]).slice(0,2).join("").toUpperCase();
+  const joinDate=new Date(user?.createdAt||ws?.createdAt||Date.now()).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+
   return <div className="src-lib">
     <header className="src-head">
-      <div>
-        <div className="src-eyebrow"><span>{ws?.name||"Workspace"}</span>{ws?.demo&&<span>Demo data</span>}</div>
-        <h1 className="src-h1">Source library</h1>
-        <p className="src-sub">Papers, PDFs, links, repositories, datasets and notes — text is extracted locally into page-referenced passages, then synced to a graph node.</p>
-      </div>
-      <div className="src-actions">
-        <div className="src-seg" role="group" aria-label="Library layout">
-          {(["grid","list"] as const).map(v=>
-            <button key={v} className={view===v?"on":""} aria-pressed={view===v} onClick={()=>setView(v)}>{v==="grid"?"Grid":"List"}</button>)}
+      <div className="src-head-top">
+        <div>
+          <div className="src-eyebrow"><span>{ws?.name||"Workspace"}</span>{ws?.demo&&<><i className="sep"/><span>Demo data</span></>}</div>
+          <h1 className="src-h1">Source library</h1>
         </div>
-        <button className="btn btn-lime btn-sm" onClick={()=>setOpen(true)}>+ Add source</button>
+        <nav className="src-tabs" aria-label="Filter sources by status">
+          {([["all","All sources",sources.length],["ready","Ready",ready],["pipeline","In pipeline",inFlight]] as const).map(([key,label,count])=>
+            <button key={key} className={status===key?"on":""} aria-pressed={status===key} aria-label={`${label}, ${count}`} onClick={()=>setStatus(key)}>
+              {label}<em>{count}</em>
+            </button>)}
+        </nav>
       </div>
+      <p className="src-sub">Papers, PDFs, links, repositories, datasets and notes — text is extracted locally into page-referenced passages, then synced to a graph node.</p>
     </header>
 
-    <section className="src-stats" aria-label="Library summary">
-      <article className="src-stat">
-        <div className="src-stat-top"><span className="src-stat-ic">{S.docs}</span>Sources indexed</div>
-        <b>{sources.length}</b>
-        <div className="src-stat-foot"><b>+{newThisWeek}</b> added this week<span>·</span>{inFlight?`${inFlight} in pipeline`:"pipeline idle"}</div>
-      </article>
-      <article className="src-stat t-violet">
-        <div className="src-stat-top"><span className="src-stat-ic">{S.layers}</span>Passages extracted</div>
-        <b>{passages}</b>
-        <div className="src-stat-foot"><b>{chunked}</b> of {sources.length} documents with text</div>
-      </article>
-      <article className="src-stat t-blue">
-        <div className="src-stat-top"><span className="src-stat-ic">{S.link}</span>Synced to graph</div>
-        <b>{sources.length?linkedRate:0}<small>%</small></b>
-        <span className="src-meter violet" aria-hidden="true"><i style={{width:Math.max(0,Math.min(100,linkedRate))+"%"}}/></span>
-        <div className="src-stat-foot"><b>{linked}</b> of {sources.length} sources have a node</div>
-      </article>
-      <article className="src-stat t-lime">
-        <div className="src-stat-top"><span className="src-stat-ic">{S.check}</span>Ingest success</div>
-        <b>{success.total?success.rate:"—"}{success.total?<small>%</small>:null}</b>
-        <div className="src-stat-foot" title="Ready ÷ (ready + failed). Queued and processing sources are excluded.">
-          {success.total?<><b>{success.ok}</b> ready<span>·</span>{failed} failed</>:<span>No finished ingests yet</span>}
-          {ingestMs?<><span>·</span>median {fmtDuration(ingestMs)}</>:null}
-        </div>
-      </article>
-    </section>
+    <div className="src-layout">
+      <div className="src-main">
+        <section className="src-stats" aria-label="Library summary">
+          <article className="src-stat">
+            <span className="src-stat-lbl"><span className="src-stat-ic">{S.docs}</span>Sources indexed</span>
+            <div className="src-stat-row"><b>{sources.length}</b><Delta tone={newThisWeek?"up":"zero"}>+{newThisWeek} this week</Delta></div>
+            <span className="src-stat-foot">{inFlight?`${inFlight} in pipeline`:"Pipeline idle"}<span>·</span>{kinds.size} source types</span>
+          </article>
+          <article className="src-stat">
+            <span className="src-stat-lbl"><span className="src-stat-ic">{S.layers}</span>Passages extracted</span>
+            <div className="src-stat-row"><b>{passages}</b><Delta>{chunked} {chunked===1?"doc":"docs"} with text</Delta></div>
+            <span className="src-stat-foot">{sources.length?`${Math.round((chunked/Math.max(1,sources.length))*100)}% of sources parsed`:"No documents parsed yet"}</span>
+          </article>
+          <article className="src-stat">
+            <span className="src-stat-lbl"><span className="src-stat-ic">{S.link}</span>Synced to graph</span>
+            <div className="src-stat-row"><b>{sources.length?linkedRate:0}<small>%</small></b><Delta tone={linkedRate>=80?"up":linkedRate?"warn":"zero"}>{linked} linked</Delta></div>
+            <span className="src-stat-foot">{linked} of {sources.length} sources have a node</span>
+          </article>
+          <article className="src-stat">
+            <span className="src-stat-lbl"><span className="src-stat-ic">{S.check}</span>Ingest success</span>
+            <div className="src-stat-row"><b>{success.total?success.rate:"—"}{success.total?<small>%</small>:null}</b><Delta tone={failed?"down":success.total?"up":"zero"}>{success.total?`${success.ok} ready · ${failed} failed`:"no finished ingests"}</Delta></div>
+            <span className="src-stat-foot" title="Ready ÷ (ready + failed). Queued and processing sources are excluded.">{ingestMs?`Median ingest ${fmtDuration(ingestMs)}`:"Queued and processing are excluded"}</span>
+          </article>
+        </section>
 
-    <section className="src-toolbar" aria-label="Filter the library">
-      <div className="src-search">
-        {S.search}
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search titles, authors, tags, passages…" aria-label="Search the source library"/>
-        {q&&<button className="src-search-x" aria-label="Clear search" onClick={()=>setQ("")}>×</button>}
-      </div>
-      <div className="src-chips" role="group" aria-label="Filter by source type">
-        <button className={`src-chip${kind==="all"?" on":""}`} aria-pressed={kind==="all"} onClick={()=>setKind("all")}>All <em>{sources.length}</em></button>
-        {KIND_ORDER.map(k=>
-          <button key={k} className={`src-chip${kind===k?" on":""}`} aria-pressed={kind===k} onClick={()=>setKind(k)}>
-            {KIND_NOUN[k]} <em>{kinds.get(k)||0}</em>
-          </button>)}
-      </div>
-      <span className="src-count">{filtered.length} of {sources.length} shown</span>
-    </section>
-
-    {!filtered.length
-      ? <div className="src-empty">
-          {sources.length
-            ? <Empty title="No sources match" body="Try another type or search term — the library filters titles, authors, summaries, tags and extracted passages."
-                action={<button className="btn btn-primary btn-sm" onClick={()=>{setQ("");setKind("all");}}>Reset filters</button>}/>
-            : <Empty title="Your library is empty" body="Add a paper, link, repository, dataset or note — extraction produces page-referenced passages and one graph node."
-                action={<button className="btn btn-lime btn-sm" onClick={()=>setOpen(true)}>Add your first source</button>}/>}
-        </div>
-      : view==="grid"
-        ? <div className="src-grid">
-            {filtered.map(x=>{
-              const state=STATE[x.status];
-              const meta=[x.pages?`${x.pages} pages`:null,x.chunks?.length?`${x.chunks.length} passage${x.chunks.length===1?"":"s"}`:"no passages",x.durationMs?fmtDuration(x.durationMs):null].filter(Boolean).join(" · ");
-              return <article key={x.id} className={`src-card${x.status==="failed"?" failed":""}`}>
-                <div className="src-card-head">
-                  <span className={`src-kind k-${x.kind}`}><KindGlyph kind={x.kind}/></span>
-                  <div className="src-card-id">
-                    <h3 title={x.title}>{x.title}</h3>
-                    <p>{x.authors?`${x.authors} · `:""}{KIND_LABEL[x.kind]} · {rel(x.createdAt)}</p>
-                  </div>
-                  <span className={`src-state ${state.tone}`}><i/>{state.label}</span>
-                </div>
-                <p className={`src-abs${x.abstract?"":" empty"}`}>{x.abstract||"No summary yet — inspect to see extracted passages."}</p>
-                {x.tags.length>0&&<div className="src-tags">{x.tags.slice(0,4).map(t=><span key={t} className="src-tag">{t}</span>)}{x.tags.length>4&&<span className="src-tag">+{x.tags.length-4}</span>}</div>}
-                {x.status==="processing"&&<div className="src-prog"><span><em style={{fontStyle:"normal"}}>Extracting text</em><b>{x.progress}%</b></span><div className="src-bar"><i style={{width:x.progress+"%"}}/></div></div>}
-                <div className="src-card-foot">
-                  <span className="src-meta">{meta}</span>
-                  <div className="src-card-actions">
-                    <button className="src-btn" aria-label={`Inspect ${x.title}`} onClick={()=>setSel(x.id)}>Inspect</button>
-                    {x.url&&<a className="src-btn quiet" href={x.url} target="_blank" rel="noreferrer" aria-label={`Open ${x.title}`}>Open <span className="ext">↗</span></a>}
-                  </div>
-                </div>
-              </article>;
-            })}
-          </div>
-        : <div className="src-list">
-            <div className="src-row head" aria-hidden="true">
-              <span/><span>Source</span><span>Type</span><span>Status</span><span className="sr">Passages</span><span className="sr added">Added</span><span/>
+        <div className="src-pair">
+          <section className="src-panel" aria-labelledby="src-activity-title">
+            <div className="src-p-head">
+              <div><h2 id="src-activity-title">Ingest time</h2><p>Extraction time per source</p></div>
+              <span className="src-p-badge">Latest {intake.length||0}</span>
             </div>
-            {filtered.map(x=>{
-              const state=STATE[x.status];
-              return <div key={x.id} className="src-row">
-                <span className={`src-kind k-${x.kind}`}><KindGlyph kind={x.kind}/></span>
-                <div className="src-row-main">
-                  <b title={x.title}>{x.title}</b>
-                  <span>{x.abstract||x.url||"No summary yet."}</span>
+            {intake.length? <div className="src-bars" role="img" aria-label={intake.map(m=>`${m.title}: ${fmtDuration(m.durationMs)}`).join(", ")}>
+              {intake.map((m,i)=><div key={m.id} className={`src-bar-col${i===intake.length-1?" on":""}`} title={`${m.title} · ${fmtDuration(m.durationMs)}`}>
+                <div className="src-bar-track"><i style={{height:`${Math.max(2,Math.round((m.durationMs||0)/intakeMax*100))}%`}}/></div>
+                <span className="m">{KIND_LABEL[m.kind]}</span>
+              </div>)}
+            </div> : <div className="src-inline-empty">Ingest a source to record extraction time.</div>}
+            <div className="src-footrow">
+              <span>Latest <b>{intake.length?fmtDuration(intake[intake.length-1].durationMs):"—"}</b></span>
+              <span>Fastest <b>{intake.length?fmtDuration(intakeFast):"—"}</b></span>
+              <span>Slowest <b>{intake.length?fmtDuration(intakeSlow):"—"}</b></span>
+            </div>
+          </section>
+
+          <section className="src-panel" aria-labelledby="src-mix-title">
+            <div className="src-p-head">
+              <div><h2 id="src-mix-title">Source mix</h2><p>{sources.length} sources · {passages} passages</p></div>
+            </div>
+            {sources.length? <>
+              <div className="src-mix">
+                <Donut data={byKind} colors={byKind.map(k=>KIND_COLOR[k.kind])} height={196} center={{value:String(sources.length),label:"sources"}}/>
+                <div className="src-legend">
+                  {byKind.map(k=><div key={k.name}>
+                    <i style={{background:KIND_COLOR[k.kind]}}/><span className="nm">{k.name}</span><b>{k.value}</b><em>{Math.round(k.value/Math.max(1,sources.length)*100)}%</em>
+                  </div>)}
                 </div>
-                <span className="src-row-type">{KIND_LABEL[x.kind]}</span>
-                <span className={`src-state ${state.tone}`}><i/>{state.label}</span>
-                <span className="src-row-meta">{x.chunks?.length||0}</span>
-                <span className="src-row-meta added">{rel(x.createdAt)}</span>
-                <button className="src-btn" aria-label={`Inspect ${x.title}`} onClick={()=>setSel(x.id)}>Inspect</button>
-              </div>;
-            })}
-          </div>}
+              </div>
+              <div className="src-footrow"><span>Linked <b>{linked}</b></span><span>With text <b>{chunked}</b></span><span>Failed <b>{failed}</b></span></div>
+            </> : <div className="src-inline-empty">Add a source to see the library mix.</div>}
+          </section>
+        </div>
+
+        <section className="src-panel src-browser" aria-labelledby="src-browser-title">
+          <div className="src-p-head">
+            <div><h2 id="src-browser-title">All sources</h2><p>{filtered.length} of {sources.length} shown · {passages} passages indexed</p></div>
+            <div className="src-browser-act">
+              <div className="src-search">
+                {S.search}
+                <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search titles, authors, tags, passages…" aria-label="Search the source library"/>
+                {q&&<button className="src-search-x" aria-label="Clear search" onClick={()=>setQ("")}>×</button>}
+              </div>
+              <div className="src-view" role="group" aria-label="Library layout">
+                {(["grid","list"] as const).map(v=>
+                  <button key={v} className={view===v?"on":""} aria-pressed={view===v} onClick={()=>setView(v)}>{v==="grid"?"Grid":"List"}</button>)}
+              </div>
+              <button className="src-cta" onClick={()=>setOpen(true)}>+ Add source</button>
+            </div>
+          </div>
+
+          <div className="src-toolbar">
+            <div className="src-chips" role="group" aria-label="Filter by source type">
+              <button className={`src-chip${kind==="all"?" on":""}`} aria-pressed={kind==="all"} onClick={()=>setKind("all")}>All <em>{sources.length}</em></button>
+              {KIND_ORDER.map(k=>
+                <button key={k} className={`src-chip${kind===k?" on":""}`} aria-pressed={kind===k} onClick={()=>setKind(k)}>
+                  {KIND_NOUN[k]} <em>{kinds.get(k)||0}</em>
+                </button>)}
+            </div>
+            <span className="src-count">{filtered.length} of {sources.length} shown</span>
+          </div>
+
+          {!filtered.length
+            ? <div className="src-empty-wrap">
+                {sources.length
+                  ? <Empty title="No sources match" body="Try another type, status or search term — the library filters titles, authors, summaries, tags and extracted passages."
+                      action={<button className="src-cta" onClick={()=>{setQ("");setKind("all");setStatus("all");}}>Reset filters</button>}/>
+                  : <Empty title="Your library is empty" body="Add a paper, link, repository, dataset or note — extraction produces page-referenced passages and one graph node."
+                      action={<button className="src-cta" onClick={()=>setOpen(true)}>Add your first source</button>}/>}
+              </div>
+            : view==="grid"
+              ? <div className="src-grid">
+                  {filtered.map(x=>{
+                    const state=STATE[x.status];
+                    const meta=[x.pages?`${x.pages} pages`:null,x.chunks?.length?`${x.chunks.length} passage${x.chunks.length===1?"":"s"}`:"no passages",x.durationMs?fmtDuration(x.durationMs):null].filter(Boolean).join(" · ");
+                    return <article key={x.id} className={`src-card${x.status==="failed"?" failed":""}`}>
+                      <div className="src-card-head">
+                        <span className={`src-kind k-${x.kind}`}><KindGlyph kind={x.kind}/></span>
+                        <div className="src-card-id">
+                          <h3 title={x.title}>{x.title}</h3>
+                          <p>{x.authors?`${x.authors} · `:""}{KIND_LABEL[x.kind]} · {rel(x.createdAt)}</p>
+                        </div>
+                        <span className={`src-state ${state.tone}`}><i/>{state.label}</span>
+                      </div>
+                      <p className={`src-abs${x.abstract?"":" empty"}`}>{x.abstract||"No summary yet — inspect to see extracted passages."}</p>
+                      {x.tags.length>0&&<div className="src-tags">{x.tags.slice(0,4).map(t=><span key={t} className="src-tag">{t}</span>)}{x.tags.length>4&&<span className="src-tag">+{x.tags.length-4}</span>}</div>}
+                      {x.status==="processing"&&<div className="src-prog"><span><em style={{fontStyle:"normal"}}>Extracting text</em><b>{x.progress}%</b></span><div className="src-bar"><i style={{width:x.progress+"%"}}/></div></div>}
+                      <div className="src-card-foot">
+                        <span className="src-meta">{meta}</span>
+                        <div className="src-card-actions">
+                          <button className="src-btn" aria-label={`Inspect ${x.title}`} onClick={()=>setSel(x.id)}>Inspect</button>
+                          {x.url&&<a className="src-btn quiet" href={x.url} target="_blank" rel="noreferrer" aria-label={`Open ${x.title}`}>Open <span className="ext">↗</span></a>}
+                        </div>
+                      </div>
+                    </article>;
+                  })}
+                </div>
+              : <div className="src-list">
+                  <div className="src-row head" aria-hidden="true">
+                    <span/><span>Source</span><span>Type</span><span>Status</span><span className="sr">Passages</span><span className="sr added">Added</span><span/>
+                  </div>
+                  {filtered.map(x=>{
+                    const state=STATE[x.status];
+                    return <div key={x.id} className="src-row">
+                      <span className={`src-kind k-${x.kind}`}><KindGlyph kind={x.kind}/></span>
+                      <div className="src-row-main">
+                        <b title={x.title}>{x.title}</b>
+                        <span>{x.abstract||x.url||"No summary yet."}</span>
+                      </div>
+                      <span className="src-row-type">{KIND_LABEL[x.kind]}</span>
+                      <span className={`src-state ${state.tone}`}><i/>{state.label}</span>
+                      <span className="src-row-meta">{x.chunks?.length||0}</span>
+                      <span className="src-row-meta added">{rel(x.createdAt)}</span>
+                      <button className="src-btn" aria-label={`Inspect ${x.title}`} onClick={()=>setSel(x.id)}>Inspect</button>
+                    </div>;
+                  })}
+                </div>}
+        </section>
+      </div>
+
+      <aside className="src-rail" aria-label="Workspace and recent sources">
+        <section className="src-profile" aria-label="Workspace account">
+          <div className="src-profile-top">
+            <span className="src-avatar">{initials}</span>
+            <div>
+              <b>{user?.name||"Researcher"}</b>
+              <span><i className="src-star" aria-hidden>★</i> {role?role[0].toUpperCase()+role.slice(1):"Member"} · {memberCount} member{memberCount===1?"":"s"}</span>
+            </div>
+          </div>
+          <dl className="src-info">
+            <div><dt>Email</dt><dd title={user?.email}>{user?.email||"—"}</dd></div>
+            <div><dt>Workspace</dt><dd title={ws?.name}>{ws?.name||"—"}</dd></div>
+            <div><dt>Joined</dt><dd>{joinDate}</dd></div>
+            <div><dt>Sources</dt><dd className="src-info-total">{sources.length} <Delta tone={newThisWeek?"up":"zero"}>+{newThisWeek}</Delta></dd></div>
+          </dl>
+          <div className="src-health">
+            <div><span>Graph sync</span><b>{linkedRate}% linked</b></div>
+            <div className="src-health-bar" aria-hidden><i style={{width:Math.min(100,linkedRate)+"%"}}/></div>
+          </div>
+        </section>
+
+        <section className="src-panel src-recent" aria-label="Recent sources">
+          <div className="src-p-head">
+            <div><h2>My sources</h2><p>{sources.length} in this workspace</p></div>
+            <div className="src-p-act"><button className="src-link" onClick={()=>setOpen(true)}>+ Add source</button></div>
+          </div>
+          {recent.length? <div className="src-recent-list">
+            {recent.map(x=><button type="button" key={x.id} className="src-recent-row" onClick={()=>setSel(x.id)}>
+              <span className={`src-kind k-${x.kind}`}><KindGlyph kind={x.kind}/></span>
+              <span className="src-recent-main"><b title={x.title}>{x.title}</b><span className={`src-recent-state ${STATE[x.status].tone}`}>{STATE[x.status].label} · {rel(x.createdAt)}</span></span>
+              <span className="src-recent-val"><b>{x.chunks?.length||0}</b><span>passages</span></span>
+            </button>)}
+          </div> : <div className="src-inline-empty">No sources yet — add one to start the library.</div>}
+        </section>
+      </aside>
+    </div>
 
     {open&&<AddSource onClose={()=>setOpen(false)} onAdd={add}/>}
     {detail&&<SourceSheet source={detail} onClose={()=>setSel(null)}/>}
@@ -396,7 +512,7 @@ function AddSource({onClose,onAdd}:{onClose:()=>void;onAdd:(s:DraftSource)=>void
                   <div className="src-bar"><i style={{width:parsePct+"%"}}/></div>
                 </div>}
                 {error&&<div className="src-error" role="alert" style={{marginTop:8}}><div><b>Could not extract text</b>{error}</div></div>}
-                <label className="lbl" htmlFor="src-paste">Or paste text <span style={{fontWeight:500,textTransform:"none",letterSpacing:0,color:"#A2A8A6"}}>(fallback for scanned PDFs)</span></label>
+                <label className="lbl" htmlFor="src-paste">Or paste text <span style={{fontWeight:500,textTransform:"none",letterSpacing:0,color:"#8E8C85"}}>(fallback for scanned PDFs)</span></label>
                 <textarea id="src-paste" className="textarea" rows={4} value={text} onChange={e=>setText(e.target.value)} placeholder="Paste a few paragraphs from the PDF…"/>
                 <span className="src-hintline">Selectable text only. Scanned pages need OCR, which runs in the production backend.</span>
               </>}
@@ -418,7 +534,7 @@ function AddSource({onClose,onAdd}:{onClose:()=>void;onAdd:(s:DraftSource)=>void
         <span className="note">{kind==="pdf"&&!parsed&&!text.trim()?"Select a PDF or paste its text first.":"Files stay in your browser in this prototype."}</span>
         <div className="end">
           <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
-          <button className="btn btn-lime btn-sm" onClick={submit} disabled={!canIngest}>Ingest source</button>
+          <button className="src-cta" onClick={submit} disabled={!canIngest}>Ingest source</button>
         </div>
       </div>
     </div>

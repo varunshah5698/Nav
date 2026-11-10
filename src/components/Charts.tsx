@@ -1,8 +1,9 @@
 import { useId } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, ComposedChart, Area } from "recharts";
 const C=["#9C8BE5","#1E2222","#C6E838","#7AA2FF","#E4F55A","#5B4BC4","#B98A00","#D64545"];
+const MIX=["#6FD08C","#F0805A","#E8DFD0","#8B8F87","#C9A9F5","#7AA2FF"];
 const tipStyle={background:"#1E2222",color:"#fff",borderRadius:10,fontSize:12,border:"none"} as any;
-const axis={fontSize:10.5,fill:"#8B9191"} as any;
+const darkTip={background:"rgba(24,26,24,.97)",color:"#F2F0EA",borderRadius:12,fontSize:11,border:"1px solid rgba(255,255,255,.1)",boxShadow:"0 16px 40px -16px rgba(0,0,0,.8)"} as any;
 export function Bars({data,dataKey,x}:{data:any[];dataKey:string;x:string}){
   return <ResponsiveContainer width="100%" height={220}>
     <BarChart data={data} margin={{top:8,right:8,left:-18,bottom:0}}>
@@ -12,12 +13,13 @@ export function Bars({data,dataKey,x}:{data:any[];dataKey:string;x:string}){
       <Bar dataKey={dataKey} radius={[5,5,2,2]}>{data.map((_,i)=><Cell key={i} fill={C[i%C.length]}/>)}</Bar>
     </BarChart></ResponsiveContainer>;
 }
-export function Donut({data,height=210,center}:{data:{name:string;value:number}[];height?:number;center?:{value:string;label:string}}){
+export function Donut({data,height=210,center,colors}:{data:{name:string;value:number}[];height?:number;center?:{value:string;label:string};colors?:string[]}){
+  const palette=colors?.length?colors:MIX;
   return <div className="chart-donut">
     <ResponsiveContainer width="100%" height={height}>
-      <PieChart><Pie data={data} dataKey="value" nameKey="name" innerRadius={55} outerRadius={78} paddingAngle={2} cornerRadius={5} strokeWidth={0} isAnimationActive={false}>
-        {data.map((_,i)=><Cell key={i} fill={C[i%C.length]}/>)}
-      </Pie><Tooltip contentStyle={tipStyle}/></PieChart>
+      <PieChart><Pie data={data} dataKey="value" nameKey="name" innerRadius={56} outerRadius={80} paddingAngle={2.5} cornerRadius={7} strokeWidth={0} isAnimationActive={false}>
+        {data.map((_,i)=><Cell key={i} fill={palette[i%palette.length]}/>)}
+      </Pie><Tooltip contentStyle={darkTip}/></PieChart>
     </ResponsiveContainer>
     {center&&<div className="chart-donut-c"><b>{center.value}</b><span>{center.label}</span></div>}
   </div>;
@@ -41,32 +43,47 @@ function GrowthTip({active,payload,label}:any){
   const total=payload.find((p:any)=>p.dataKey==="total")?.value??0;
   return <div className="db-tip">
     <span className="db-tip-h">{label}</span>
-    <div className="db-tip-row"><i style={{background:"#C6E838"}}/>Added<b>{added}</b></div>
-    <div className="db-tip-row"><i style={{background:"#7A67D6",borderRadius:"50%"}}/>Corpus<b>{total}</b></div>
+    <div className="db-tip-row"><i style={{background:"#F0805A"}}/>Added<b>{added}</b></div>
+    <div className="db-tip-row"><i style={{background:"#CFC7B8",borderRadius:"50%"}}/>Corpus<b>{total}</b></div>
   </div>;
 }
 /** Daily (or weekly) additions as bars with the cumulative corpus as an area, on one count axis. */
 export function Growth({data}:{data:GrowthPoint[]}){
-  return <ResponsiveContainer width="100%" height={252}>
+  const peak=Math.max(...data.map(d=>d.added),0);
+  return <ResponsiveContainer width="100%" height={244}>
     <ComposedChart data={data} margin={{top:12,right:4,left:-18,bottom:0}}>
       <defs>
         <linearGradient id="dbGrowth" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#9C8BE5" stopOpacity={0.22}/>
-          <stop offset="100%" stopColor="#9C8BE5" stopOpacity={0}/>
-        </linearGradient>
-        <linearGradient id="dbBar" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#D8F85E"/>
-          <stop offset="100%" stopColor="#AFD222"/>
+          <stop offset="0%" stopColor="#D8D2C4" stopOpacity={0.16}/>
+          <stop offset="100%" stopColor="#D8D2C4" stopOpacity={0}/>
         </linearGradient>
       </defs>
-      <CartesianGrid strokeDasharray="2 6" stroke="#E9EBE4" vertical={false}/>
-      <XAxis dataKey="label" tick={axis} axisLine={false} tickLine={false} minTickGap={20}/>
-      <YAxis tick={axis} axisLine={false} tickLine={false} allowDecimals={false} width={40}/>
-      <Tooltip content={<GrowthTip/> as any} cursor={{fill:"rgba(30,34,34,.04)"}}/>
-      <Area type="monotone" dataKey="total" name="Cumulative" stroke="#7A67D6" strokeWidth={2.3} fill="url(#dbGrowth)" dot={false}
-        isAnimationActive={false} activeDot={{r:4.5,fill:"#7A67D6",stroke:"#fff",strokeWidth:2}}/>
-      <Bar dataKey="added" name="Added" fill="url(#dbBar)" radius={[5,5,2,2]} maxBarSize={20} isAnimationActive={false}/>
+      <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,.08)" vertical={false}/>
+      <XAxis dataKey="label" tick={{fontSize:10.5,fill:"#9B9A93"}} axisLine={false} tickLine={false} minTickGap={18}/>
+      <YAxis tick={{fontSize:10.5,fill:"#9B9A93"}} axisLine={false} tickLine={false} allowDecimals={false} width={38}/>
+      <Tooltip content={<GrowthTip/> as any} cursor={{fill:"rgba(255,255,255,.045)"}}/>
+      <Area type="monotone" dataKey="total" name="Cumulative" stroke="#CFC7B8" strokeWidth={2} fill="url(#dbGrowth)" dot={false}
+        isAnimationActive={false} activeDot={{r:4,fill:"#F0805A",stroke:"#1D1F1C",strokeWidth:2}}/>
+      <Bar dataKey="added" name="Added" radius={[6,6,3,3]} maxBarSize={22} isAnimationActive={false}>
+        {data.map((d,i)=><Cell key={i} fill={d.added===peak&&peak>0?"#F0805A":"#565A54"}/>)}
+      </Bar>
     </ComposedChart>
+  </ResponsiveContainer>;
+}
+
+/** Validation accuracy per finished run, best run highlighted. */
+export function RunBars({data}:{data:{label:string;value:number}[]}){
+  const best=Math.max(...data.map(d=>d.value),0);
+  return <ResponsiveContainer width="100%" height={244}>
+    <BarChart data={data} margin={{top:14,right:6,left:-16,bottom:0}}>
+      <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,.08)" vertical={false}/>
+      <XAxis dataKey="label" tick={{fontSize:10.5,fill:"#9B9A93"}} axisLine={false} tickLine={false} interval={0}/>
+      <YAxis domain={[0,100]} ticks={[0,25,50,75,100]} tick={{fontSize:10.5,fill:"#9B9A93"}} axisLine={false} tickLine={false} width={42}/>
+      <Tooltip contentStyle={darkTip} cursor={{fill:"rgba(255,255,255,.045)"}}/>
+      <Bar dataKey="value" name="Accuracy" radius={[8,8,4,4]} maxBarSize={40} isAnimationActive={false}>
+        {data.map((d,i)=><Cell key={i} fill={d.value===best&&best>0?"#6FD08C":"#565A54"}/>)}
+      </Bar>
+    </BarChart>
   </ResponsiveContainer>;
 }
 
