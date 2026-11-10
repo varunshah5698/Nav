@@ -567,7 +567,7 @@ export default function Collaboration() {
         try {
           await reassignAttachments({ from: oldId, to: newId });
         } catch {
-          /* demo attachments can be re-added if the move fails */
+          toast("Existing demo files could not be moved — re-attach them in the shared workspace.");
         }
         toast("This demo workspace is now shared.");
       } else {
@@ -835,7 +835,7 @@ export default function Collaboration() {
           </h1>
           <p className="shx-hero-sub">
             Invite the people, attach your own handoff files, then build an export from what actually exists in the
-            workspace. Roles stay enforced; uploads stay in your account and exports stay in the browser.
+            workspace. Roles stay enforced; uploads follow the workspace roster and exports stay in the browser.
           </p>
           <div className="shx-hero-actions">
             <button className="shx-btn lime" onClick={openPicker}>
@@ -849,7 +849,7 @@ export default function Collaboration() {
             <span><b>{members.length}</b> people</span>
             <span><b>{pending.length}</b> pending</span>
             <span><b>{exportsLog.length}</b> exports</span>
-            <span><b>{attachments.length}</b> files stored</span>
+            <span><b>{attachments.length}</b> files shared</span>
           </div>
         </div>
         <ShareCore people={members.length} files={attachments.length} exportsCount={exportsLog.length} pending={pending.length} />
@@ -916,7 +916,7 @@ export default function Collaboration() {
             <span className="shx-filestack" aria-hidden><i /><i /><i /></span>
           </div>
           <div className="shx-kpi-foot">
-            {attachments.length ? `${prettySize(totalUploadBytes)} · stored in your account` : "Bring your own PDF, CSV, JSON…"}
+            {attachments.length ? `${prettySize(totalUploadBytes)} · shared with the team` : "Bring your own PDF, CSV, JSON…"}
           </div>
         </article>
       </section>
