@@ -615,6 +615,7 @@ export default function Collaboration() {
               className="shx-file-input"
               type="file"
               multiple
+              tabIndex={-1}
               accept={FILE_ACCEPT}
               onChange={(e) => {
                 addFiles(e.target.files);
@@ -634,7 +635,7 @@ export default function Collaboration() {
           <div className="shx-tray">
             <div className="shx-tray-head">
               <span className="shx-kicker">Session tray</span>
-              <span className="shx-tray-count">{uploads.length}</span>
+              <span className="shx-tray-count" aria-live="polite">{uploads.length}</span>
               {uploads.length > 0 && (
                 <label className="shx-file-search">
                   <Ico name="search" />
