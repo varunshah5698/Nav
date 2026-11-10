@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { useStore, label } from "../lib/store";
 import type { AgentName, AgentRun, AgentStatus, Source } from "../lib/types";
 import { pct } from "../lib/analytics";
-import { Empty } from "../components/ui";
 import "../styles/agents.css";
 
 /* ---------- crew ---------- */
@@ -19,14 +18,14 @@ const CREW: { n: AgentName; hint: string; d: string; needs: string }[] = [
 ];
 
 const TINT: Record<AgentName, string> = {
-  controller: "#D8F85E",
-  paper_reader: "#9C8BE5",
-  equation: "#F0CE4E",
-  code_setup: "#8FA6A6",
+  controller: "#F3703F",
+  paper_reader: "#C9BDFF",
+  equation: "#F2B64B",
+  code_setup: "#9FB7B2",
   experiment: "#7FB0FF",
-  benchmark: "#5BE39A",
-  memory: "#CBB6FF",
-  review: "#FFB27A",
+  benchmark: "#82E78F",
+  memory: "#D9B8FF",
+  review: "#FF937A",
 };
 
 const SUGGEST: Record<AgentName, string[]> = {
@@ -67,12 +66,14 @@ function AgentGlyph({ agent }: { agent: AgentName }) {
 }
 
 const I = {
-  pulse: <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="9" r="6.4"/><path d="M9 5.4V9l2.3 1.5"/></svg>,
-  gate: <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="8" width="10" height="7" rx="1.6"/><path d="M6.4 8V6.2a2.6 2.6 0 0 1 5.2 0V8"/></svg>,
-  check: <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="9" r="6.4"/><path d="m6 9.2 2.1 2.1L12.2 7"/></svg>,
-  trend: <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 13.5 7.2 9l2.6 2.4L15 5.5"/><path d="M11.6 5.5H15v3.4"/></svg>,
-  lock: <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="8" width="10" height="7" rx="1.6"/><path d="M6.4 8V6.2a2.6 2.6 0 0 1 5.2 0V8"/></svg>,
-  doc: <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 2.5h5L14.5 7v8a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1Z"/><path d="M10 2.5V7h4.5"/></svg>,
+  pulse: <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6.4"/><path d="M9 5.4V9l2.3 1.5"/></svg>,
+  gate: <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="8" width="10" height="7" rx="1.6"/><path d="M6.4 8V6.2a2.6 2.6 0 0 1 5.2 0V8"/></svg>,
+  check: <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6.4"/><path d="m6 9.2 2.1 2.1L12.2 7"/></svg>,
+  lock: <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="8" width="10" height="7" rx="1.6"/><path d="M6.4 8V6.2a2.6 2.6 0 0 1 5.2 0V8"/></svg>,
+  doc: <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 2.5h5L14.5 7v8a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1Z"/><path d="M10 2.5V7h4.5"/></svg>,
+  plus: <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M9 3.5v11M3.5 9h11"/></svg>,
+  arrow: <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 9h10M9.5 5l4 4-4 4"/></svg>,
+  close: <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m5 5 8 8M13 5l-8 8"/></svg>,
 };
 
 /* ---------- time ---------- */
@@ -85,6 +86,7 @@ const rel = (iso: string) => {
   const d = Math.round(h / 24); if (d < 30) return `${d}d ago`;
   return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 };
+const shortDay = (date: Date) => date.toLocaleDateString("en-GB", { weekday: "short" });
 
 type Filter = "all" | "gates" | "live" | "done";
 
@@ -113,15 +115,57 @@ export default function Agents() {
 
   const needsSource = agent === "paper_reader" || agent === "equation" || agent === "review";
   const srcForTask = sources.find(s => s.id === srcId) || sources[0];
+  const selectedCrew = CREW.find(c => c.n === agent) || CREW[1];
 
   const waiting = agents.filter(a => a.status === "waiting_approval");
   const recentGates = agents.filter(a => a.approval && a.approval.state !== "pending").slice(0, 4);
   const liveCount = agents.filter(a => a.status === "queued" || a.status === "running" || a.status === "paused").length;
+  const queuedCount = agents.filter(a => a.status === "queued").length;
+  const runningCount = agents.filter(a => a.status === "running").length;
+  const pausedCount = agents.filter(a => a.status === "paused").length;
   const completed = agents.filter(a => a.status === "completed").length;
   const failed = agents.filter(a => a.status === "failed").length;
   const cancelled = agents.filter(a => a.status === "cancelled").length;
   const finished = completed + failed;
   const successRate = finished ? pct(completed, finished) : null;
+
+  const weekData = useMemo(() => {
+    const startDay = new Date();
+    startDay.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, i) => {
+      const day = new Date(startDay);
+      day.setDate(startDay.getDate() - (6 - i));
+      const next = new Date(day);
+      next.setDate(day.getDate() + 1);
+      const count = agents.filter(a => {
+        const t = new Date(a.createdAt);
+        return t >= day && t < next;
+      }).length;
+      return { label: shortDay(day), date: day, count };
+    });
+  }, [agents]);
+  const weekTotal = weekData.reduce((sum, day) => sum + day.count, 0);
+  const weekMax = Math.max(1, ...weekData.map(day => day.count));
+  const peakDay = weekData.reduce((best, day, i) => day.count > weekData[best].count ? i : best, 0);
+  const activityLabel = `Agent runs per day over the last seven days: ${weekData.map(day => `${day.label} ${day.count}`).join(", ")}.`;
+
+  const outcomeGroups = [
+    { label: "Completed", count: completed, color: "#82E78F" },
+    { label: "Needs approval", count: waiting.length, color: "#F2B64B" },
+    { label: "Active", count: liveCount, color: "#C9BDFF" },
+    { label: "Failed / stopped", count: failed + cancelled, color: "#FF937A" },
+  ];
+  const outcomeTotal = outcomeGroups.reduce((sum, group) => sum + group.count, 0);
+  const donutRadius = 64;
+  const donutCircumference = 2 * Math.PI * donutRadius;
+  let donutCursor = 0;
+  const donutSegments = outcomeGroups.map(group => {
+    const fraction = outcomeTotal ? group.count / outcomeTotal : 0;
+    const dash = fraction ? Math.max(fraction * donutCircumference - 5, 1) : 0;
+    const offset = -(donutCursor * donutCircumference + 2.5);
+    donutCursor += fraction;
+    return { ...group, dash, offset };
+  }).filter(group => group.count > 0);
 
   const visible = useMemo(() => agents.filter(a => {
     if (filter === "gates") return a.status === "waiting_approval";
@@ -177,215 +221,371 @@ export default function Agents() {
 
   const filterCount = (f: Filter) => f === "all" ? agents.length : f === "gates" ? waiting.length : f === "live" ? liveCount : completed + failed + cancelled;
 
-  return <div className="ag-room">
-    <header className="ag-head">
-      <div>
-        <div className="ag-eyebrow"><span>{ws?.name || "Workspace"}</span>{ws?.demo && <span>Demo data</span>}</div>
-        <h1 className="ag-h1">Agent control room</h1>
-        <p className="ag-sub">Delegate one instruction, then watch the Controller route it. Consequential steps stop here until you approve them.</p>
+  const latestFor = (n: AgentName) => {
+    const runs = agents.filter(a => a.agent === n);
+    return { runs, last: runs[0], state: runs[0] ? STATE[runs[0].status] : null };
+  };
+
+  return <div className="hza-page">
+    <header className="hza-head">
+      <div className="hza-head-copy">
+        <div className="hza-eyebrow">
+          <span className="hza-eyebrow-ws"><i />{ws?.name || "Workspace"}</span>
+          {ws?.demo && <span className="hza-eyebrow-demo">Demo data</span>}
+        </div>
+        <h1>Agent control room</h1>
+        <p>Delegate one instruction, then watch the Controller route it. Consequential steps stop here until you approve them.</p>
       </div>
-      <div className="ag-head-side">
-        <span className="ag-now">
-          <i className={liveCount ? "live" : waiting.length ? "gate" : ""} />
-          {liveCount ? `${liveCount} active` : waiting.length ? `${waiting.length} waiting` : "all quiet"}
-          <span style={{ color: "#C6CBC7" }}>·</span>
+      <div className="hza-head-side">
+        <span className={`hza-live-pill${liveCount ? " live" : waiting.length ? " gate" : ""}`}>
+          <i />
+          {liveCount ? `${liveCount} active` : waiting.length ? `${waiting.length} waiting` : "All quiet"}
+          <span className="hza-live-sep">·</span>
           {waiting.length} gate{waiting.length === 1 ? "" : "s"}
         </span>
-        <button className="btn btn-primary btn-sm" onClick={focusComposer}>New run</button>
+        <button className="hza-btn hza-btn-primary hza-new-btn" onClick={focusComposer}>
+          {I.plus} New run
+        </button>
       </div>
     </header>
 
-    <section className="ag-stats" aria-label="Agent summary">
-      <article className="ag-stat t-violet">
-        <div className="ag-stat-top"><span className="ag-stat-ic">{I.pulse}</span>Active now</div>
-        <b>{liveCount}</b>
-        <div className="ag-stat-foot"><b>{agents.length}</b> run{agents.length === 1 ? "" : "s"} in this workspace</div>
-      </article>
-      <article className="ag-stat t-warn">
-        <div className="ag-stat-top"><span className="ag-stat-ic">{I.gate}</span>Awaiting approval</div>
-        <b>{waiting.length}</b>
-        <div className="ag-stat-foot">{waiting.length ? "safety gates open" : "all clear"}{waiting.length ? <><span>·</span><b>{label(waiting[0].agent)}</b></> : null}</div>
-      </article>
-      <article className="ag-stat t-good">
-        <div className="ag-stat-top"><span className="ag-stat-ic">{I.check}</span>Completed</div>
-        <b>{completed}</b>
-        <div className="ag-stat-foot"><b>{failed}</b> failed<span>·</span>{cancelled} cancelled</div>
-      </article>
-      <article className="ag-stat t-blue">
-        <div className="ag-stat-top"><span className="ag-stat-ic">{I.trend}</span>Success rate</div>
-        <b>{successRate === null ? "—" : successRate}{successRate === null ? null : <small>%</small>}</b>
-        <div className="ag-stat-foot">{successRate === null ? "no finished runs yet" : "completed ÷ finished runs"}</div>
-      </article>
-    </section>
+    <div className="hza-layout">
+      <main className="hza-main">
+        <section className="hza-kpis" aria-label="Agent summary">
+          <article className="hza-kpi">
+            <div className="hza-kpi-top">
+              <span className="hza-kpi-label">Active now</span>
+              <span className={`hza-kpi-dot${liveCount ? " live" : ""}`} />
+            </div>
+            <div className="hza-kpi-main">
+              <b>{liveCount}</b>
+              <span className="hza-chip neutral">{agents.length} run{agents.length === 1 ? "" : "s"}</span>
+            </div>
+            <p className="hza-kpi-foot">
+              {queuedCount} queued <span>·</span> {runningCount} running{pausedCount ? <> <span>·</span> {pausedCount} paused</> : null}
+            </p>
+          </article>
+          <article className="hza-kpi">
+            <div className="hza-kpi-top">
+              <span className="hza-kpi-label">Awaiting approval</span>
+              <span className={`hza-kpi-dot${waiting.length ? " gate" : ""}`} />
+            </div>
+            <div className="hza-kpi-main">
+              <b>{waiting.length}</b>
+              <span className={`hza-chip ${waiting.length ? "warn" : "good"}`}>{waiting.length ? "Needs you" : "All clear"}</span>
+            </div>
+            <p className="hza-kpi-foot">{waiting.length ? "Safety gates are holding work." : "Consequential actions are gated."}</p>
+          </article>
+          <article className="hza-kpi">
+            <div className="hza-kpi-top">
+              <span className="hza-kpi-label">Completed</span>
+              <span className="hza-kpi-dot live" />
+            </div>
+            <div className="hza-kpi-main">
+              <b>{completed}</b>
+              <span className="hza-chip good">{agents.length ? `${pct(completed, agents.length)}% of runs` : "No runs"}</span>
+            </div>
+            <p className="hza-kpi-foot">{failed} failed <span>·</span> {cancelled} cancelled</p>
+          </article>
+          <article className="hza-kpi">
+            <div className="hza-kpi-top">
+              <span className="hza-kpi-label">Success rate</span>
+              <span className="hza-kpi-dot violet" />
+            </div>
+            <div className="hza-kpi-main">
+              <b>{successRate === null ? "—" : successRate}{successRate === null ? null : <small>%</small>}</b>
+              <span className="hza-chip neutral">{finished} finished</span>
+            </div>
+            <p className="hza-kpi-foot">Completed ÷ finished runs</p>
+          </article>
+        </section>
 
-    <section className="ag-deck" ref={deckRef} aria-label="Delegate a task">
-      <div className="ag-deck-head">
-        <div>
-          <h2>Delegate a task</h2>
-          <p>Pick a specialist and give it one clear instruction. The Controller sequences follow-up work; risky steps stay behind a gate.</p>
-        </div>
-        <span className="ag-gate-pill">{I.lock} Approval gates on</span>
-      </div>
-      <div className="ag-deck-grid">
-        <div className="ag-picks" role="radiogroup" aria-label="Choose an agent">
-          {CREW.map(c => <button key={c.n} type="button" role="radio" aria-checked={agent === c.n}
-            className={`ag-pick${agent === c.n ? " on" : ""}`} style={{ "--tint": TINT[c.n] } as CSSProperties}
-            onClick={() => pickAgent(c.n)}>
-            <span className="ag-pick-ic"><AgentGlyph agent={c.n} /></span>
-            <b>{label(c.n)}</b>
-            <em>{c.needs}</em>
-          </button>)}
+        <div className="hza-charts">
+          <article className="hza-card hza-activity">
+            <div className="hza-card-head">
+              <div><h2>Run activity</h2><p>Runs started per day</p></div>
+              <span className="hza-note">Last 7 days</span>
+            </div>
+            <div className="hza-chart-meta">
+              <b>{weekTotal}</b><span>runs this week</span>
+              <span className="hza-chip neutral">peak {Math.max(...weekData.map(day => day.count))}</span>
+            </div>
+            <div className="hza-bars" role="img" aria-label={activityLabel}>
+              {weekData.map((day, i) => {
+                const height = day.count ? Math.max(8, Math.round(day.count / weekMax * 100)) : 0;
+                const hot = day.count > 0 && i === peakDay;
+                return <div className="hza-bar-col" key={day.label + i} title={`${day.date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} · ${day.count} run${day.count === 1 ? "" : "s"}`}>
+                  <span className={`hza-bar${hot ? " hot" : ""}${day.count ? "" : " zero"}`} style={{ height: `${height}%` }} />
+                </div>;
+              })}
+            </div>
+            <div className="hza-bar-labels" aria-hidden="true">
+              {weekData.map((day, i) => <span key={day.label + i}>{day.label}</span>)}
+            </div>
+            <div className="hza-activity-foot">
+              <span><i className="hza-legend-dot hot" /> Highlighted peak</span>
+              <span>{weekTotal ? `${weekTotal} total` : "No runs this week"}</span>
+            </div>
+          </article>
+
+          <article className="hza-card hza-outcomes">
+            <div className="hza-card-head">
+              <div><h2>Run outcomes</h2><p>Across every run</p></div>
+              <span className="hza-note">{outcomeTotal} total</span>
+            </div>
+            <div className="hza-outcome-body">
+              <div className="hza-donut-wrap">
+                <svg className="hza-donut" viewBox="0 0 200 200" role="img" aria-label={`Run outcomes: ${outcomeGroups.map(group => `${group.label} ${group.count}`).join(", ")}`}>
+                  <circle cx="100" cy="100" r={donutRadius} fill="none" stroke="rgba(255,255,255,.065)" strokeWidth="22" />
+                  <g transform="rotate(-90 100 100)" fill="none" strokeWidth="22">
+                    {donutSegments.map(segment => <circle key={segment.label} cx="100" cy="100" r={donutRadius} stroke={segment.color} strokeDasharray={`${segment.dash} ${donutCircumference - segment.dash}`} strokeDashoffset={segment.offset} />)}
+                  </g>
+                </svg>
+                <div className="hza-donut-center"><b>{outcomeTotal}</b><span>runs</span></div>
+              </div>
+              <ul className="hza-outcome-legend">
+                {outcomeGroups.map(group => <li key={group.label}>
+                  <span className="hza-outcome-dot" style={{ background: group.color }} />
+                  <span className="hza-outcome-label">{group.label}</span>
+                  <b>{group.count}</b>
+                  <span className="hza-outcome-pct">{outcomeTotal ? `${Math.round(group.count / outcomeTotal * 100)}%` : "—"}</span>
+                </li>)}
+              </ul>
+            </div>
+          </article>
         </div>
 
-        <div className="ag-compose">
-          <div className="ag-compose-top"><b>{label(agent)}</b><span>Instruction</span></div>
-          <textarea ref={taskRef} className="ag-task" value={task} onChange={e => setTask(e.target.value)}
-            placeholder={`Ask the ${label(agent).toLowerCase()} to…`} aria-label="Task instruction" />
-          <div className="ag-suggest">
-            {SUGGEST[agent].map(s => <button key={s} type="button" className={task.trim() === s ? "on" : ""} onClick={() => setTask(s)}>{s}</button>)}
+        <section className="hza-card hza-deck" ref={deckRef} aria-labelledby="hza-deck-title">
+          <div className="hza-card-head hza-deck-head">
+            <div>
+              <h2 id="hza-deck-title">Delegate a task</h2>
+              <p>Pick a specialist and give it one clear instruction. The Controller sequences follow-up work; risky steps stay behind a gate.</p>
+            </div>
+            <span className="hza-gate-pill">{I.lock}<span>Approval gates on</span></span>
           </div>
-          {needsSource && (sources.length
-            ? <label className="ag-src">
-                <span className="ag-src-label">Source</span>
-                <select value={srcForTask?.id || ""} onChange={e => setSrcId(e.target.value)} aria-label="Source to analyze">
-                  {sources.map(s => <option key={s.id} value={s.id}>{s.title.length > 44 ? s.title.slice(0, 44) + "…" : s.title}</option>)}
-                </select>
-                <span className="ag-src-meta">{srcForTask?.pages ? `${srcForTask.pages}p` : `${srcForTask?.chunks?.length || 0} passages`}</span>
-              </label>
-            : <span className="ag-no-source">{I.doc}<span>No extracted source yet — <Link to="/app/sources">add a PDF in Sources</Link> to analyse your own paper.</span></span>)}
-          <div className="ag-compose-foot">
-            <span className="note">{needsSource ? "Quotes the selected source verbatim. No LLM key needed." : "Code setup, experiments and memory writes always ask first."}</span>
-            <button className="btn btn-lime" onClick={runTask} disabled={!task.trim() || (needsSource && !srcForTask)}>Run via Controller</button>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <div className="ag-main">
-      <section className="ag-panel" aria-label="Run stream">
-        <div className="ag-panel-h">
-          <h2>Run stream</h2>
-          <span className="ag-count">{agents.length}</span>
-          <div className="ag-tabs" role="group" aria-label="Filter runs">
-            {(["all", "gates", "live", "done"] as const).map(f =>
-              <button key={f} className={filter === f ? "on" : ""} aria-pressed={filter === f} onClick={() => setFilter(f)}>
-                {f === "all" ? "All" : f === "gates" ? "Gates" : f === "live" ? "Live" : "Done"} {filterCount(f)}
-              </button>)}
+          <div className="hza-picks" role="radiogroup" aria-label="Choose an agent">
+            {CREW.map(c => <button key={c.n} type="button" role="radio" aria-checked={agent === c.n}
+              className={`hza-pick${agent === c.n ? " on" : ""}`} style={{ "--tint": TINT[c.n] } as CSSProperties}
+              title={c.d} onClick={() => pickAgent(c.n)}>
+              <span className="hza-pick-ic"><AgentGlyph agent={c.n} /></span>
+              <span className="hza-pick-text"><b>{label(c.n)}</b><em>{c.hint}</em></span>
+            </button>)}
           </div>
-        </div>
-        {!agents.length
-          ? <div className="ag-empty"><Empty title="No agent runs yet" body="Delegate a task above — every event, approval and artifact will appear here and persist across reloads."
-              action={<button className="btn btn-lime btn-sm" onClick={focusComposer}>Delegate your first task</button>} /></div>
-          : !visible.length
-            ? <div className="ag-empty"><Empty title="No runs in this view" body="Nothing matches this filter right now. Switch back to All to see the full stream." /></div>
-            : <div className="ag-runs">{visible.map(a => {
-              const st = STATE[a.status];
-              const src = a.inputRef ? sourceById.get(a.inputRef) : undefined;
-              return <div className="ag-run" key={a.id}>
-                <button className="ag-run-hit" onClick={() => setSel(a.id)} aria-label={`Inspect ${label(a.agent)} run: ${a.task}`}>
-                  <span className="ag-run-ic" style={{ "--tint": TINT[a.agent] } as CSSProperties}><AgentGlyph agent={a.agent} /></span>
-                  <span className="ag-run-main">
-                    <span className="ag-run-top"><b>{label(a.agent)}</b></span>
-                    <span className="ag-run-task">{a.task}</span>
-                    <span className="ag-run-meta">
-                      <span>{rel(a.createdAt)}</span>
-                      {src && <><span className="sep">·</span><span className="src">{src.title}</span></>}
-                      {typeof a.confidence === "number" && <><span className="sep">·</span><span className="ag-conf"><span className="track"><i style={{ width: Math.round(a.confidence * 100) + "%" }} /></span>{(a.confidence * 100).toFixed(0)}%</span></>}
-                    </span>
-                  </span>
-                </button>
-                <div className="ag-run-side">
-                  <span className={`ag-state ${st.tone}`}><i />{st.text}</span>
-                  <button className="ag-chev" aria-label="Open run details" onClick={() => setSel(a.id)}>›</button>
+
+          <div className="hza-compose">
+            <div className="hza-compose-main">
+              <div className="hza-compose-head">
+                <span className="hza-compose-agent" style={{ "--tint": TINT[agent] } as CSSProperties}><AgentGlyph agent={agent} /></span>
+                <div className="hza-compose-id">
+                  <b>{label(agent)}</b>
+                  <span>{selectedCrew.hint} · {selectedCrew.needs.toLowerCase()}</span>
                 </div>
-                <div className="ag-run-extra">
-                  {a.status === "waiting_approval" && <button className="ag-mini warn" onClick={() => setSel(a.id)}>Review gate</button>}
-                  {a.status === "running" && <button className="ag-mini" onClick={() => pause(a.id)}>Pause</button>}
-                  {a.status === "paused" && <button className="ag-mini" onClick={() => resume(a.id)}>Resume</button>}
-                  {(a.status === "running" || a.status === "paused" || a.status === "queued") && <button className="ag-mini danger" onClick={() => cancel(a.id)}>Cancel</button>}
-                  <span style={{ marginLeft: "auto", fontSize: 9, color: "#A2A8A6" }}>{a.events.length} event{a.events.length === 1 ? "" : "s"}</span>
-                </div>
-              </div>;
-            })}</div>}
-      </section>
+                <span className="hza-compose-kicker">Instruction</span>
+              </div>
+              <textarea ref={taskRef} className="hza-task" value={task} onChange={e => setTask(e.target.value)}
+                placeholder={`Ask the ${label(agent).toLowerCase()} to…`} aria-label="Task instruction" />
+              <div className="hza-suggest">
+                {SUGGEST[agent].map(s => <button key={s} type="button" className={task.trim() === s ? "on" : ""} onClick={() => setTask(s)}>{s}</button>)}
+              </div>
+              {needsSource && (sources.length
+                ? <label className="hza-source">
+                    <span className="hza-source-label">Source</span>
+                    <select value={srcForTask?.id || ""} onChange={e => setSrcId(e.target.value)} aria-label="Source to analyze">
+                      {sources.map(s => <option key={s.id} value={s.id}>{s.title.length > 44 ? s.title.slice(0, 44) + "…" : s.title}</option>)}
+                    </select>
+                    <span className="hza-source-meta">{srcForTask?.pages ? `${srcForTask.pages}p` : `${srcForTask?.chunks?.length || 0} passages`}</span>
+                  </label>
+                : <span className="hza-no-source">{I.doc}<span>No extracted source yet — <Link to="/app/sources">add a PDF in Sources</Link> to analyse your own paper.</span></span>)}
+            </div>
 
-      <div className="ag-rail">
-      <aside className="ag-panel ag-approvals" aria-label="Approval queue">
-        <div className="ag-panel-h">
-          <h2>Approval queue</h2>
-          <span className="ag-count">{waiting.length}</span>
-          {waiting.length ? <span className="ag-hint">needs you</span> : null}
-        </div>
-        {waiting.length ? waiting.map(a => <div className="ag-approval" key={a.id}>
-          <div className="ag-approval-top">
-            <span className="ag-approval-ic">{I.gate}</span>
-            <span className="ag-approval-id"><b>{label(a.agent)}</b><span>{a.approval?.action}</span></span>
-            <span className="ag-state warn"><i />Gate</span>
+            <aside className="hza-compose-side">
+              <div className="hza-policy">
+                <span className="hza-policy-ic">{I.lock}</span>
+                <div><b>Guarded by default</b><p>Code setup, experiments and memory writes pause here until you approve them.</p></div>
+              </div>
+              <ul className="hza-policy-list">
+                <li>{I.check}<span>Source citations stay attached</span></li>
+                <li>{I.lock}<span>Consequential steps wait for you</span></li>
+                <li>{I.doc}<span>Every run keeps an audit trail</span></li>
+              </ul>
+              <button className="hza-btn hza-btn-primary hza-run-btn" onClick={runTask} disabled={!task.trim() || (needsSource && !srcForTask)}>
+                Run via Controller {I.arrow}
+              </button>
+              <p className="hza-compose-note">{needsSource ? "Quotes the selected source verbatim. No LLM key needed." : "The Controller sequences follow-up work and holds every gate."}</p>
+            </aside>
           </div>
-          <p>{a.approval?.reason}</p>
-          <dl>
-            <div><dt>Expected</dt><dd>{a.approval?.expected}</dd></div>
-            <div><dt>Risk</dt><dd>{a.approval?.risks}</dd></div>
+        </section>
+
+        <section className="hza-card hza-stream" aria-labelledby="hza-stream-title">
+          <div className="hza-stream-head">
+            <div className="hza-title-line"><h2 id="hza-stream-title">Run stream</h2><span className="hza-count">{agents.length}</span></div>
+            <div className="hza-tabs" role="group" aria-label="Filter runs">
+              {(["all", "gates", "live", "done"] as const).map(f =>
+                <button key={f} type="button" className={filter === f ? "on" : ""} aria-pressed={filter === f} onClick={() => setFilter(f)}>
+                  {f === "all" ? "All" : f === "gates" ? "Gates" : f === "live" ? "Live" : "Done"}<span>{filterCount(f)}</span>
+                </button>)}
+            </div>
+          </div>
+
+          {!agents.length
+            ? <div className="hza-stream-empty">
+                <span className="hza-empty-ic">{I.pulse}</span>
+                <b>No agent runs yet</b>
+                <p>Delegate a task above — every event, approval and artifact will appear here and persist across reloads.</p>
+                <button className="hza-btn hza-btn-primary" onClick={focusComposer}>Delegate your first task</button>
+              </div>
+            : !visible.length
+              ? <div className="hza-stream-empty">
+                  <span className="hza-empty-ic">{I.gate}</span>
+                  <b>No runs in this view</b>
+                  <p>Nothing matches this filter right now. Switch back to all runs to see the full stream.</p>
+                  <button className="hza-btn hza-btn-ghost" onClick={() => setFilter("all")}>Show all runs</button>
+                </div>
+              : <div className="hza-runs">
+                  {visible.map(a => {
+                    const st = STATE[a.status];
+                    const src = a.inputRef ? sourceById.get(a.inputRef) : undefined;
+                    const actionable = a.status === "waiting_approval" || a.status === "running" || a.status === "paused" || a.status === "queued";
+                    return <div className={`hza-run${a.status === "waiting_approval" ? " gate" : ""}`} key={a.id}>
+                      <button className="hza-run-hit" onClick={() => setSel(a.id)} aria-label={`Inspect ${label(a.agent)} run: ${a.task}`}>
+                        <span className="hza-run-ic" style={{ "--tint": TINT[a.agent] } as CSSProperties}><AgentGlyph agent={a.agent} /></span>
+                        <span className="hza-run-main">
+                          <span className="hza-run-task">{a.task}</span>
+                          <span className="hza-run-meta">
+                            <b>{label(a.agent)}</b>
+                            <span className="hza-sep">·</span>
+                            <span>{rel(a.createdAt)}</span>
+                            {src && <><span className="hza-sep">·</span><span className="hza-run-src">{src.title}</span></>}
+                            {typeof a.confidence === "number" && <><span className="hza-sep">·</span><span className="hza-conf"><span className="hza-conf-track"><i style={{ width: Math.round(a.confidence * 100) + "%" }} /></span>{(a.confidence * 100).toFixed(0)}%</span></>}
+                          </span>
+                        </span>
+                      </button>
+                      <div className="hza-run-side">
+                        <span className={`hza-state ${st.tone}`}><i />{st.text}</span>
+                        <button className="hza-chev" aria-label="Open run details" onClick={() => setSel(a.id)}>›</button>
+                      </div>
+                      {actionable && <div className="hza-run-actions">
+                        {a.status === "waiting_approval" && <button className="hza-mini warn" onClick={() => setSel(a.id)}>Review gate</button>}
+                        {a.status === "running" && <button className="hza-mini" onClick={() => pause(a.id)}>Pause</button>}
+                        {a.status === "paused" && <button className="hza-mini" onClick={() => resume(a.id)}>Resume</button>}
+                        {(a.status === "running" || a.status === "paused" || a.status === "queued") && <button className="hza-mini danger" onClick={() => cancel(a.id)}>Cancel</button>}
+                        <span className="hza-event-count">{a.events.length} event{a.events.length === 1 ? "" : "s"}</span>
+                      </div>}
+                    </div>;
+                  })}
+                </div>}
+        </section>
+      </main>
+
+      <aside className="hza-rail">
+        <section className="hza-card hza-controller" aria-labelledby="hza-controller-title">
+          <div className="hza-controller-head">
+            <span className="hza-controller-avatar"><AgentGlyph agent="controller" /><i /></span>
+            <div className="hza-controller-id">
+              <h2 id="hza-controller-title">Controller</h2>
+              <p>Orchestrator · guarded</p>
+            </div>
+            <span className="hza-chip good hza-online"><i />Online</span>
+          </div>
+          <p className="hza-controller-copy">Routes every specialist, sequences follow-up work, and stops at every gate. Nothing consequential executes without you.</p>
+          <dl className="hza-controller-facts">
+            <div><dt>Specialists</dt><dd>{CREW.length}</dd></div>
+            <div><dt>Runs</dt><dd>{agents.length}</dd></div>
+            <div><dt>Active</dt><dd>{liveCount}</dd></div>
+            <div><dt>Success</dt><dd>{successRate === null ? "—" : `${successRate}%`}</dd></div>
           </dl>
-          <div className="ag-approval-btns">
-            <button className="btn btn-primary" onClick={() => approve(a.id)}>Approve</button>
-            <button className="btn btn-ghost" onClick={() => modify(a.id)}>Modify</button>
-            <button className="btn btn-ghost" onClick={() => reject(a.id)}>Reject</button>
-            <button className="btn btn-ghost" onClick={() => setSel(a.id)}>Inspect</button>
+        </section>
+
+        <section className="hza-card hza-approvals" aria-labelledby="hza-approvals-title">
+          <div className="hza-card-head hza-rail-head">
+            <div><h2 id="hza-approvals-title">Approval queue</h2><p>{waiting.length ? "Consequential steps are waiting for you." : "Every gate is clear."}</p></div>
+            <span className={`hza-count${waiting.length ? " warn" : ""}`}>{waiting.length}</span>
           </div>
-        </div>) : <div className="ag-clear">
-          <span className="ag-clear-ic">{I.check}</span>
-          <div><b>No gates waiting</b><p>Consequential actions pause here until you approve them.</p></div>
-        </div>}
-        <p className="ag-rail-note">Approval gates are enforced in the store: code setup, experiments and memory writes cannot execute without you.</p>
+          {waiting.length
+            ? waiting.map(a => <div className="hza-gate-card" key={a.id}>
+                <div className="hza-gate-top">
+                  <span className="hza-gate-ic">{I.gate}</span>
+                  <div className="hza-gate-id"><b>{label(a.agent)}</b><span>{a.approval?.action}</span></div>
+                  <span className="hza-state warn"><i />Gate</span>
+                </div>
+                <p className="hza-gate-reason">{a.approval?.reason}</p>
+                <div className="hza-gate-facts">
+                  <div><span>Expected</span><b>{a.approval?.expected}</b></div>
+                  <div><span>Risk</span><b>{a.approval?.risks}</b></div>
+                </div>
+                <div className="hza-gate-actions">
+                  <button className="hza-btn hza-btn-primary hza-btn-xs" onClick={() => approve(a.id)}>Approve</button>
+                  <button className="hza-btn hza-btn-ghost hza-btn-xs" onClick={() => modify(a.id)}>Modify</button>
+                  <button className="hza-btn hza-btn-ghost hza-btn-xs" onClick={() => reject(a.id)}>Reject</button>
+                  <button className="hza-btn-link" onClick={() => setSel(a.id)}>Inspect</button>
+                </div>
+              </div>)
+            : <div className="hza-clear">
+                <span className="hza-clear-ic">{I.check}</span>
+                <div><b>No gates waiting</b><p>Consequential actions pause here until you approve them.</p></div>
+              </div>}
+
+          {recentGates.length > 0 && <div className="hza-resolved">
+            <div className="hza-subhead">Recently resolved <span>{recentGates.length}</span></div>
+            {recentGates.map(a => {
+              const approved = a.approval?.state === "approved";
+              return <button key={a.id} className="hza-resolved-row" onClick={() => setSel(a.id)} aria-label={`Open ${label(a.agent)} gate`}>
+                <span className={`hza-resolved-dot ${approved ? "ok" : "bad"}`} />
+                <span className="hza-resolved-main"><b>{label(a.agent)}</b><span>{a.approval?.action}</span></span>
+                <span className={`hza-state ${approved ? "ok" : "bad"}`}><i />{approved ? "Approved" : "Rejected"}</span>
+              </button>;
+            })}
+          </div>}
+          <p className="hza-rail-note">Approval gates are enforced in the store: code setup, experiments and memory writes cannot execute without you.</p>
+        </section>
+
+        <section className="hza-card hza-crew" aria-labelledby="hza-crew-title">
+          <div className="hza-card-head hza-rail-head">
+            <div><h2 id="hza-crew-title">Specialists</h2><p>Pick one to compose a task.</p></div>
+            <span className="hza-count">{CREW.length}</span>
+          </div>
+          <div className="hza-crew-list">
+            {CREW.map(c => {
+              const latest = latestFor(c.n);
+              return <button key={c.n} type="button" className={`hza-crew-row${agent === c.n ? " on" : ""}`} style={{ "--tint": TINT[c.n] } as CSSProperties}
+                onClick={() => { pickAgent(c.n); focusComposer(); }} aria-label={`Delegate to ${label(c.n)}`}>
+                <span className="hza-crew-ic"><AgentGlyph agent={c.n} /></span>
+                <span className="hza-crew-main"><b>{label(c.n)}</b><em>{c.hint}</em></span>
+                <span className="hza-crew-side">
+                  {latest.state ? <span className={`hza-state ${latest.state.tone}`}><i />{latest.state.short}</span> : <span className="hza-state idle"><i />Idle</span>}
+                  <span className="hza-crew-count">{latest.runs.length}</span>
+                </span>
+              </button>;
+            })}
+          </div>
+        </section>
+
+        <section className="hza-card hza-guardrails" aria-labelledby="hza-guardrails-title">
+          <div className="hza-card-head hza-rail-head">
+            <div><h2 id="hza-guardrails-title">Guardrails</h2><p>What always applies</p></div>
+          </div>
+          <ul className="hza-guard-list">
+            <li>
+              <span className="hza-guard-ic gold">{I.lock}</span>
+              <div><b>Approval gates</b><span>Code, experiments and memory writes wait for you.</span></div>
+            </li>
+            <li>
+              <span className="hza-guard-ic violet">{I.doc}</span>
+              <div><b>Citations stay attached</b><span>Outputs keep their source references.</span></div>
+            </li>
+            <li>
+              <span className="hza-guard-ic blue">{I.pulse}</span>
+              <div><b>Audit trail</b><span>Every event is timestamped and inspectable.</span></div>
+            </li>
+            <li>
+              <span className="hza-guard-ic good">{I.check}</span>
+              <div><b>Workspace scope</b><span>Runs never leave the active workspace.</span></div>
+            </li>
+          </ul>
+        </section>
       </aside>
-
-      <section className="ag-panel ag-history" aria-label="Recent approvals">
-        <div className="ag-panel-h">
-          <h2>Recent gates</h2>
-          <span className="ag-count">{recentGates.length}</span>
-          {recentGates.length ? <span className="ag-hint">resolved</span> : null}
-        </div>
-        {recentGates.length ? <div className="ag-hist">{recentGates.map(a => {
-          const approved = a.approval?.state === "approved";
-          return <button key={a.id} className="ag-hist-row" onClick={() => setSel(a.id)} aria-label={`Open ${label(a.agent)} gate`}>
-            <span className="ag-hist-dot" style={{ background: approved ? "var(--good)" : "var(--bad)" }} />
-            <span className="ag-hist-main"><b>{label(a.agent)}</b><span>{a.approval?.action}</span></span>
-            <span className={`ag-state ${approved ? "ok" : "bad"}`}><i />{approved ? "Approved" : "Rejected"}</span>
-          </button>;
-        })}</div> : <p className="ag-rail-note">Resolved approvals will be listed here so every gate stays auditable.</p>}
-      </section>
-      </div>
     </div>
-
-    <section className="ag-crew-sec">
-      <div className="ag-sec-head">
-        <h2>The crew</h2>
-        <p>Eight specialists, one routing controller.</p>
-        <span className="ag-count">{agents.length} run{agents.length === 1 ? "" : "s"}</span>
-      </div>
-      <div className="ag-crew">
-        {CREW.map(c => {
-          const runs = agents.filter(a => a.agent === c.n);
-          const last = runs[0];
-          const st = last ? STATE[last.status] : null;
-          return <button key={c.n} type="button" className="ag-card" style={{ "--tint": TINT[c.n] } as CSSProperties}
-            onClick={() => { pickAgent(c.n); focusComposer(); }} aria-label={`Delegate to ${label(c.n)}`}>
-            <span className="ag-card-top">
-              <span className="ag-card-ic"><AgentGlyph agent={c.n} /></span>
-              <span className="ag-card-id"><b>{label(c.n)}</b><span>{c.hint}</span></span>
-              {st && <span className={`ag-state ${st.tone}`}><i />{st.short}</span>}
-            </span>
-            <p>{c.d}</p>
-            <span className="ag-card-foot">
-              <span>{runs.length} run{runs.length === 1 ? "" : "s"}</span>
-              <span className="ag-needs">{c.needs}</span>
-              <span className="ag-use">Use →</span>
-            </span>
-          </button>;
-        })}
-      </div>
-    </section>
 
     {detail && <RunSheet run={detail} source={detail.inputRef ? sourceById.get(detail.inputRef) : undefined}
       onClose={closeSheet}
@@ -412,20 +612,20 @@ function RunSheet({ run, source, onClose, onApprove, onReject, onPause, onResume
   const st = STATE[run.status];
   const approvalTone = run.approval?.state === "approved" ? "ok" : run.approval?.state === "rejected" ? "bad" : "warn";
 
-  return <div className="ag-overlay" onClick={onClose}>
-    <aside className="ag-sheet" role="dialog" aria-modal="true" aria-labelledby="ag-sheet-title" onClick={e => e.stopPropagation()}>
-      <header className="ag-sheet-head">
-        <span className="ag-sheet-ic" style={{ "--tint": TINT[run.agent] } as CSSProperties}><AgentGlyph agent={run.agent} /></span>
-        <div className="ag-sheet-id">
-          <div className="ag-sheet-kicker">{label(run.agent)}<span className={`ag-state ${st.tone}`}><i />{st.text}</span></div>
-          <h2 id="ag-sheet-title">{run.task}</h2>
+  return <div className="hza-overlay" onClick={onClose}>
+    <aside className="hza-sheet" role="dialog" aria-modal="true" aria-labelledby="hza-sheet-title" onClick={e => e.stopPropagation()}>
+      <header className="hza-sheet-head">
+        <span className="hza-sheet-ic" style={{ "--tint": TINT[run.agent] } as CSSProperties}><AgentGlyph agent={run.agent} /></span>
+        <div className="hza-sheet-id">
+          <div className="hza-sheet-kicker"><span>{label(run.agent)}</span><span className={`hza-state ${st.tone}`}><i />{st.text}</span></div>
+          <h2 id="hza-sheet-title">{run.task}</h2>
           <p>Started {fullDate(run.createdAt)} · updated {rel(run.updatedAt)}</p>
         </div>
-        <button className="ag-x" aria-label="Close run details" onClick={onClose}>×</button>
+        <button className="hza-close" aria-label="Close run details" onClick={onClose} autoFocus>{I.close}</button>
       </header>
 
-      <div className="ag-sheet-body">
-        <dl className="ag-meta">
+      <div className="hza-sheet-body">
+        <dl className="hza-meta">
           <div><dt>Agent</dt><dd>{label(run.agent)}</dd></div>
           <div><dt>Status</dt><dd>{st.text}</dd></div>
           <div><dt>Source</dt><dd>{source?.title || "—"}</dd></div>
@@ -434,46 +634,48 @@ function RunSheet({ run, source, onClose, onApprove, onReject, onPause, onResume
           <div><dt>Tool calls</dt><dd className="code">{run.toolCalls?.length ? run.toolCalls.join(", ") : "—"}</dd></div>
         </dl>
 
-        {run.approval && <div className="ag-gate">
-          <div className="ag-gate-top">
-            <b>{run.approval.action}</b>
-            <span className={`ag-state ${approvalTone}`}><i />{run.approval.state[0].toUpperCase() + run.approval.state.slice(1)}</span>
+        {run.approval && <div className="hza-gate-box">
+          <div className="hza-gate-top">
+            <span className="hza-gate-ic">{I.gate}</span>
+            <div className="hza-gate-id"><b>{run.approval.action}</b><span>Approval gate</span></div>
+            <span className={`hza-state ${approvalTone}`}><i />{run.approval.state[0].toUpperCase() + run.approval.state.slice(1)}</span>
           </div>
-          <p>{run.approval.reason}</p>
-          <dl>
-            <div><dt>Expected</dt><dd>{run.approval.expected}</dd></div>
-            <div><dt>Risk</dt><dd>{run.approval.risks}</dd></div>
-          </dl>
-          {run.status === "waiting_approval" && <div className="ag-gate-acts">
-            <button className="btn btn-primary" onClick={onApprove}>Approve</button>
-            <button className="btn btn-ghost" onClick={onReject}>Reject</button>
+          <p className="hza-gate-reason">{run.approval.reason}</p>
+          <div className="hza-gate-facts">
+            <div><span>Expected</span><b>{run.approval.expected}</b></div>
+            <div><span>Risk</span><b>{run.approval.risks}</b></div>
+          </div>
+          {run.approval.note && <p className="hza-gate-note">Note · {run.approval.note}</p>}
+          {run.status === "waiting_approval" && <div className="hza-gate-actions">
+            <button className="hza-btn hza-btn-primary hza-btn-xs" onClick={onApprove}>Approve</button>
+            <button className="hza-btn hza-btn-ghost hza-btn-xs" onClick={onReject}>Reject</button>
           </div>}
         </div>}
 
-        <section>
-          <div className="ag-sec-h"><h3>Output</h3>{run.output && <button className="ag-copy" onClick={onCopy}>Copy</button>}</div>
+        <section className="hza-section">
+          <div className="hza-sec-head"><h3>Output</h3>{run.output && <button className="hza-copy" onClick={onCopy}>Copy</button>}</div>
           {run.output
-            ? <pre className="ag-output">{run.output}</pre>
-            : <p className="ag-muted">{run.status === "waiting_approval" ? "Waiting for your approval — nothing has executed yet." : "No output yet. Queued and running tasks write their result when they finish."}</p>}
+            ? <pre className="hza-output">{run.output}</pre>
+            : <p className="hza-muted">{run.status === "waiting_approval" ? "Waiting for your approval — nothing has executed yet." : "No output yet. Queued and running tasks write their result when they finish."}</p>}
         </section>
 
-        <section>
-          <div className="ag-sec-h"><h3>Event log</h3><span style={{ marginLeft: "auto", fontSize: 9, color: "#A2A8A6" }}>{run.events.length} event{run.events.length === 1 ? "" : "s"}</span></div>
-          <ol className="ag-timeline">
-            {run.events.map((e, i) => <li className="ag-ev" key={i}>
-              <span className={`ag-ev-dot ${e.kind}`} />
-              <div className="ag-ev-main">{e.text}<time>{fullDate(e.ts)}{e.detail ? ` · ${e.detail}` : ""}</time></div>
+        <section className="hza-section">
+          <div className="hza-sec-head"><h3>Event log</h3><span className="hza-sec-note">{run.events.length} event{run.events.length === 1 ? "" : "s"}</span></div>
+          <ol className="hza-timeline">
+            {run.events.map((e, i) => <li className="hza-event" key={i}>
+              <span className={`hza-ev-dot ${e.kind}`} />
+              <div className="hza-ev-main">{e.text}<time>{fullDate(e.ts)}{e.detail ? ` · ${e.detail}` : ""}</time></div>
             </li>)}
           </ol>
         </section>
       </div>
 
-      <footer className="ag-sheet-foot">
-        {run.status === "running" && <button className="btn btn-ghost" onClick={onPause}>Pause</button>}
-        {run.status === "paused" && <button className="btn btn-ghost" onClick={onResume}>Resume</button>}
-        {(run.status === "queued" || run.status === "running" || run.status === "paused") && <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>}
-        <button className="btn btn-ghost" onClick={onRedirect}>Redirect</button>
-        <button className="btn btn-primary spacer" onClick={onClose}>Close</button>
+      <footer className="hza-sheet-foot">
+        {run.status === "running" && <button className="hza-btn hza-btn-ghost hza-btn-sm" onClick={onPause}>Pause</button>}
+        {run.status === "paused" && <button className="hza-btn hza-btn-ghost hza-btn-sm" onClick={onResume}>Resume</button>}
+        {(run.status === "queued" || run.status === "running" || run.status === "paused") && <button className="hza-btn hza-btn-ghost hza-btn-sm" onClick={onCancel}>Cancel</button>}
+        <button className="hza-btn hza-btn-ghost hza-btn-sm" onClick={onRedirect}>Redirect</button>
+        <button className="hza-btn hza-btn-primary hza-btn-sm hza-sheet-close" onClick={onClose}>Close</button>
       </footer>
     </aside>
   </div>;
