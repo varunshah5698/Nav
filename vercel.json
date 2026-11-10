@@ -10,14 +10,6 @@
   ],
   "rewrites": [
     {
-      "source": "/api/analyst",
-      "destination": "https://nav-y35d.onrender.com/api/analyst"
-    },
-    {
-      "source": "/api/analyst/:path*",
-      "destination": "https://nav-y35d.onrender.com/api/analyst/:path*"
-    },
-    {
       "source": "/app/:path*",
       "destination": "/index.html"
     },

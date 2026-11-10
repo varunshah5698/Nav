@@ -2,6 +2,9 @@ export const config = { runtime: "edge" };
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const MAX_BODY = 400_000;
+// Same deployment as the Render web service. Used only when this Vercel
+// project has no GROQ_API_KEY of its own.
+const FALLBACK = "https://nav-y35d.onrender.com/api/analyst";
 
 const SYSTEM_PROMPT = `You are the AI Analyst embedded in ResearchGraph, a connected research workspace — a conversational assistant for the user's research, not a report generator.
 
@@ -21,6 +24,31 @@ const json = (body, status = 200) =>
     headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
   });
 
+async function proxyToRender(request) {
+  let body;
+  try {
+    body = await request.text();
+  } catch {
+    return json({ error: "Could not read the request body." }, 400);
+  }
+  try {
+    const upstream = await fetch(FALLBACK, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", accept: "text/plain" },
+      body,
+    });
+    const headers = {
+      "Content-Type": upstream.headers.get("content-type") || "text/plain; charset=utf-8",
+      "Cache-Control": "no-store",
+    };
+    const model = upstream.headers.get("x-analyst-model");
+    if (model) headers["X-Analyst-Model"] = model;
+    return new Response(upstream.body, { status: upstream.status, headers });
+  } catch (err) {
+    return json({ error: `Analyst proxy failed: ${err?.message || "network error"}` }, 502);
+  }
+}
+
 export default async function handler(request) {
   const path = new URL(request.url).pathname;
   const env = process.env;
@@ -32,12 +60,10 @@ export default async function handler(request) {
 
   if (path !== "/api/analyst") return json({ error: "Not found." }, 404);
   if (request.method !== "POST") return json({ error: "Use POST for /api/analyst." }, 405);
-  if (!env.GROQ_API_KEY) {
-    return json({ error: "The analyst service has no Groq key configured on this deployment." }, 503);
-  }
   if (Number(request.headers.get("content-length") || 0) > MAX_BODY) {
     return json({ error: "Request body too large." }, 413);
   }
+  if (!env.GROQ_API_KEY) return proxyToRender(request);
 
   let payload;
   try {
