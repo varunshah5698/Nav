@@ -257,7 +257,7 @@
 
 .shx-drop{
   position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;
-  min-height:272px;padding:26px 22px;border-radius:18px;cursor:pointer;text-align:center;
+  min-height:210px;padding:26px 22px;border-radius:18px;cursor:pointer;text-align:center;
   background:
     radial-gradient(90% 80% at 50% 0%,rgba(243,112,63,.11),rgba(243,112,63,0) 62%),
     rgba(255,255,255,.018);
@@ -295,8 +295,8 @@
 .shx-drop-privacy svg{width:12px;height:12px;color:#8FBF16}
 
 .shx-tray{
-  display:flex;flex-direction:column;min-width:0;min-height:272px;padding:11px;border-radius:18px;
-  background:rgba(0,0,0,.18);border:1px solid var(--shx-line-soft);
+  display:flex;flex-direction:column;min-width:0;min-height:210px;padding:11px;border-radius:18px;
+  background:rgba(255,255,255,.025);border:1px solid var(--shx-line-soft);
 }
 .shx-tray-head{display:flex;align-items:center;gap:8px;padding:2px 3px 9px}
 .shx-tray-count{
@@ -414,7 +414,10 @@
 .shx-format-blurb{grid-area:blurb;font-size:9px;line-height:1.35;color:#8F8A83;margin-top:3px}
 
 /* ---------- access + map ---------- */
-.shx-main{display:grid;grid-template-columns:minmax(0,1.34fr) minmax(0,1fr);gap:14px;align-items:start}
+.shx-main{display:grid;grid-template-columns:minmax(0,1.34fr) minmax(0,1fr);gap:14px;align-items:stretch}
+.shx-access{display:flex;flex-direction:column}
+.shx-access .shx-note{flex:1;display:flex;flex-direction:column}
+.shx-access .shx-note textarea{flex:1}
 .shx-invite{
   display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:end;
   margin-top:15px;padding:11px 12px;border-radius:14px;
@@ -617,7 +620,7 @@
 }
 .shx-copy:hover{background:rgba(216,248,94,.16)}
 .shx-code{
-  margin:0;padding:13px 14px 16px;flex:1;min-height:260px;max-height:372px;overflow:auto;
+  margin:0;padding:13px 14px 16px;flex:1;min-height:220px;max-height:300px;overflow:auto;
   font-family:var(--mono);font-size:10.5px;line-height:1.62;color:#C6D3CE;
   white-space:pre-wrap;word-break:break-word;
 }
@@ -626,7 +629,9 @@
 .shx-code::-webkit-scrollbar-track{background:transparent}
 
 /* ---------- history + activity ---------- */
-.shx-lower{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;align-items:start}
+.shx-lower{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;align-items:stretch}
+.shx-lower .shx-card{display:flex;flex-direction:column}
+.shx-lower .shx-empty{flex:1;display:grid;place-items:center}
 .shx-card-head{display:flex;align-items:center;gap:9px;margin-bottom:9px}
 .shx-card-head h2{font-size:12.5px;font-weight:750;letter-spacing:-.012em;margin:0;color:var(--shx-text)}
 .shx-card-head .badge{margin-left:auto}
