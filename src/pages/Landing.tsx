@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import Constellation from "../components/Constellation";
 import { LogoMark } from "../components/Logo";
 import ConnectionGraph from "../components/ConnectionGraph";
+const ScrollUniverse = lazy(() => import("../components/ScrollUniverse"));
 import "../styles/landing.css";
 
 const NAV = [
@@ -16,7 +17,7 @@ const NAV = [
 const FRAGMENTS = [
   { ic: "📄", t: "lightweight-cnn.pdf", s: "Paper · 14 pages · 3 equations", tail: "loose file" },
   { ic: "🗂", t: "PlantVillage subset", s: "Dataset · 2,431 images", tail: "open tab" },
-  { ic: "💻", t: "github.com/demo/leaf-cnn", s: "Repository · PyTorch", tail: "no link" },
+  { ic: "💻", t: "github.com/leaf-lab/leaf-cnn", s: "Repository · PyTorch", tail: "no link" },
   { ic: "🗒", t: "Augmentation recipe", s: "Note · 6 bullet points", tail: "unfiled" },
   { ic: "⚠", t: "train_epoch5.log", s: "Error log · CUDA unavailable", tail: "no fix" },
 ];
@@ -151,7 +152,7 @@ export default function Landing() {
         </div>
 
         <div className="lp-hero-foot">
-          <a className="lp-scroll" href="#problem">
+          <a className="lp-scroll" href="#universe">
             <span className="lp-scroll-line" aria-hidden="true" />
             Scroll
           </a>
@@ -164,6 +165,10 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      <Suspense fallback={<div className="lp-universe-fallback" aria-hidden="true" />}>
+        <ScrollUniverse />
+      </Suspense>
 
       <div className="lp-ticker" aria-hidden="true">
         <div className="lp-ticker-track">
@@ -434,7 +439,7 @@ elapsed 00:04:12`}</div>
           </div>
           <div className="lp-foot-bottom">
             <span>© 2026 ResearchGraph · connected research workspace</span>
-            <span>Prototype · data stored locally in your browser · demo data labelled</span>
+            <span>Prototype · data stored in your workspace · export any time</span>
           </div>
         </div>
       </footer>

@@ -1537,3 +1537,319 @@
     animation: none;
   }
 }
+
+/* ==========================================================================
+   Scroll universe — sticky 3D knowledge graph
+   ========================================================================== */
+
+.lp-universe {
+  --u-progress: 0;
+  position: relative;
+  height: 300vh;
+  background: #080b0b;
+  color: #f2f5f2;
+}
+
+.lp-universe-sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(52% 70% at 78% 44%, rgba(216, 248, 94, 0.055), transparent 66%),
+    radial-gradient(50% 70% at 20% 60%, rgba(156, 139, 229, 0.055), transparent 70%),
+    #080b0b;
+}
+
+.lp-universe-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.lp-universe-stage canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.lp-universe-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(70% 70% at 64% 48%, #000, transparent 78%);
+  -webkit-mask-image: radial-gradient(70% 70% at 64% 48%, #000, transparent 78%);
+}
+
+.lp-universe-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(8, 11, 11, 0.95) 0%, rgba(8, 11, 11, 0.78) 27%, rgba(8, 11, 11, 0.15) 58%, transparent 78%),
+    linear-gradient(180deg, #080b0b 0%, transparent 15%, transparent 84%, #080b0b 100%);
+}
+
+.lp-universe-inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 1200px;
+  height: 100%;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.lp-u-copy {
+  width: min(510px, 100%);
+  padding-top: 18px;
+}
+
+.lp-u-kicker {
+  color: rgba(240, 245, 241, 0.5);
+}
+
+.lp-u-kicker b {
+  color: #0e120d;
+  background: var(--lp-lime);
+}
+
+.lp-u-title {
+  margin: 20px 0 16px;
+  font-size: clamp(38px, 4.6vw, 58px);
+  font-weight: 680;
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+  color: #f6f8f5;
+}
+
+.lp-u-title em {
+  color: var(--lp-lime);
+  font-family: var(--lp-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.025em;
+}
+
+.lp-u-lead {
+  max-width: 46ch;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: rgba(234, 240, 236, 0.58);
+}
+
+.lp-u-steps {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 21px;
+  margin: 30px 0 0;
+  padding: 0 0 0 22px;
+  list-style: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.13);
+}
+
+.lp-u-steps::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 0;
+  width: 2px;
+  height: calc(var(--u-progress) * 100%);
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--lp-lime), var(--lp-violet));
+  opacity: 0.8;
+}
+
+.lp-u-steps li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 7px;
+  opacity: 0.34;
+  transform: translateX(0);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.lp-u-steps li::before {
+  content: "";
+  position: absolute;
+  left: -25px;
+  top: 7px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  transition: background 0.35s ease, box-shadow 0.35s ease;
+}
+
+.lp-u-steps li.is-active {
+  opacity: 1;
+  transform: translateX(3px);
+}
+
+.lp-u-steps li.is-active::before {
+  background: var(--lp-lime);
+  box-shadow: 0 0 0 3px rgba(216, 248, 94, 0.16), 0 0 14px rgba(216, 248, 94, 0.5);
+}
+
+.lp-u-n {
+  padding-top: 2px;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  color: var(--lp-lime);
+}
+
+.lp-u-steps b {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: #f0f4ee;
+}
+
+.lp-u-steps p {
+  max-width: 40ch;
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: rgba(234, 240, 236, 0.5);
+}
+
+.lp-u-hint {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 25px;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(234, 240, 236, 0.35);
+}
+
+.lp-u-hint i {
+  display: block;
+  width: 46px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--lp-lime), transparent);
+}
+
+.lp-u-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 25px;
+  z-index: 3;
+  width: 178px;
+  height: 2px;
+  transform: translateX(-50%);
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.lp-u-bar i {
+  display: block;
+  width: calc(var(--u-progress) * 100%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--lp-lime), var(--lp-violet));
+  transition: width 0.14s linear;
+}
+
+@media (max-width: 900px) {
+  .lp-universe {
+    height: 260vh;
+  }
+
+  .lp-universe-inner {
+    align-items: flex-start;
+    padding-top: 88px;
+  }
+
+  .lp-u-copy {
+    width: min(520px, 100%);
+    padding-top: 0;
+  }
+
+  .lp-u-title {
+    font-size: clamp(38px, 8vw, 46px);
+  }
+
+  .lp-universe-scrim {
+    background:
+      linear-gradient(180deg, #080b0b 0%, rgba(8, 11, 11, 0.9) 30%, rgba(8, 11, 11, 0.48) 58%, rgba(8, 11, 11, 0.12) 82%, #080b0b 100%),
+      linear-gradient(90deg, rgba(8, 11, 11, 0.62), transparent 72%);
+  }
+
+  .lp-u-title,
+  .lp-u-lead,
+  .lp-u-steps {
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.6);
+  }
+
+  .lp-u-steps {
+    gap: 15px;
+    margin-top: 23px;
+  }
+
+  .lp-u-steps p {
+    font-size: 11px;
+  }
+
+  .lp-u-bar {
+    bottom: 17px;
+    width: 132px;
+  }
+}
+
+@media (max-width: 600px) {
+  .lp-u-title {
+    font-size: 34px;
+  }
+
+  .lp-u-lead {
+    font-size: 12.5px;
+  }
+
+  .lp-u-steps li {
+    grid-template-columns: 21px minmax(0, 1fr);
+  }
+
+  .lp-u-steps b {
+    font-size: 12.5px;
+  }
+
+  .lp-u-hint {
+    margin-top: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-u-steps li,
+  .lp-u-steps li::before,
+  .lp-u-bar i {
+    transition: none;
+  }
+}
+
+.lp-universe-fallback {
+  height: 300vh;
+  background: #080b0b;
+}
+
+@media (max-width: 900px) {
+  .lp-universe-fallback {
+    height: 260vh;
+  }
+}
