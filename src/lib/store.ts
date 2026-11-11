@@ -2,12 +2,13 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Activity, AgentName, AgentRun, Edge, Experiment, Invite, MemoryEntry, RNode, SearchLog, Source, User, Workspace, Membership, ExportJob, SharedSyncInput } from "./types";
 import { chunkPages, leadOf, digestSource } from "./text";
+import { seedDemo } from "./seed";
 
 const uid=(p:string)=>p+"-"+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4);
 const now=()=>new Date().toISOString();
 
 interface State {
-  users:User[]; sessionUserId:string|null; cloudReady:boolean;
+  users:User[]; sessionUserId:string|null; cloudReady:boolean; demoSeeded:boolean;
   workspaces:Workspace[]; memberships:Membership[]; activeWs:string|null;
   nodes:RNode[]; edges:Edge[]; sources:Source[]; agents:AgentRun[];
   experiments:Experiment[]; memories:MemoryEntry[]; activities:Activity[];
@@ -22,7 +23,7 @@ interface State {
   importSnapshot:(payload:string)=>void;
   applySharedSync:(input:SharedSyncInput)=>void;
   // ws
-  createWorkspace:(name:string,desc:string)=>void; switchWs:(id:string)=>void;
+  createWorkspace:(name:string,desc:string)=>void; switchWs:(id:string)=>void; deleteWorkspace:(id:string)=>void;
   canEdit:()=>boolean; isOwner:()=>boolean;
   // generic helpers
   toast:(m:string)=>void; log:(ws:string,kind:string,text:string,refType?:string,refId?:string)=>void;
@@ -51,45 +52,61 @@ interface State {
   logSearch:(ws:string,query:string,results:number,ms:number)=>void; markOpened:(ws:string)=>void;
 }
 export const useStore = create<State>()(persist((set,get)=>({
-  users:[], sessionUserId:null, cloudReady:false, workspaces:[], memberships:[], activeWs:null,
+  users:[], sessionUserId:null, cloudReady:false, demoSeeded:false, workspaces:[], memberships:[], activeWs:null,
   nodes:[], edges:[], sources:[], agents:[], experiments:[], memories:[], activities:[],
   invites:[], exports:[], searchLogs:[], toasts:[],
   toast:(m)=>{ set(s=>({toasts:[...s.toasts,m]})); setTimeout(()=>set(s=>({toasts:s.toasts.slice(1)})),3200); },
   log:(ws,kind,text,refType,refId)=>set(s=>({activities:[{id:uid("ac"),workspaceId:ws,kind,text,refType,refId,createdAt:now()},...s.activities].slice(0,400)})),
 
   startSession:(u)=>set({
-    users:[u], sessionUserId:u.id, cloudReady:false,
+    users:[u], sessionUserId:u.id, cloudReady:false, demoSeeded:false,
     workspaces:[], memberships:[], activeWs:null,
     nodes:[], edges:[], sources:[], agents:[], experiments:[], memories:[], activities:[],
     invites:[], exports:[], searchLogs:[],
   }),
   clearSession:()=>set({
-    users:[], sessionUserId:null, cloudReady:false,
+    users:[], sessionUserId:null, cloudReady:false, demoSeeded:false,
     workspaces:[], memberships:[], activeWs:null,
     nodes:[], edges:[], sources:[], agents:[], experiments:[], memories:[], activities:[],
     invites:[], exports:[], searchLogs:[],
   }),
   initFor:(userId)=>{
     if(get().workspaces.length){ set({cloudReady:true}); return; }
-    const ws:Workspace={id:uid("ws"),name:"My workspace",description:"",ownerId:userId,createdAt:now()};
+    const demo=seedDemo(userId);
     set({
-      workspaces:[ws], memberships:[{workspaceId:ws.id,userId,role:"owner"}], activeWs:ws.id,
-      nodes:[], edges:[], sources:[], experiments:[], memories:[], agents:[], activities:[],
-      invites:[], exports:[], searchLogs:[], cloudReady:true,
+      workspaces:[demo.ws], memberships:[{workspaceId:demo.ws.id,userId,role:"owner"}], activeWs:demo.ws.id,
+      nodes:demo.nodes, edges:demo.edges, sources:demo.sources, experiments:demo.experiments,
+      memories:demo.memories, agents:demo.agents, activities:demo.acts,
+      invites:[], exports:[], searchLogs:[], demoSeeded:true, cloudReady:true,
     });
-    get().log(ws.id,"workspace","Workspace created.");
+    get().log(demo.ws.id,"workspace","Demo workspace added.");
   },
   loadSnapshot:(payload)=>{
     try{
       const d=JSON.parse(payload) as Partial<State>;
+      const raw=d.workspaces??[];
+      const userId=get().sessionUserId;
+      const hasDemo=raw.some(w=>w.demo);
+      const shouldSeed=Boolean(userId) && !hasDemo && (!d.demoSeeded || !raw.length) && !raw.some(w=>w.id==="ws-demo-plant");
+      const demo=shouldSeed ? seedDemo(userId!) : null;
+      const workspaces=demo ? [...raw,demo.ws] : raw;
+      const memberships=demo
+        ? [...(d.memberships??[]),{workspaceId:demo.ws.id,userId:userId!,role:"owner" as const}]
+        : (d.memberships??[]);
       set({
-        workspaces:(d.workspaces??[]).map(w=>({...w,demo:false})), memberships:d.memberships??[],
-        activeWs:d.activeWs??d.workspaces?.[0]?.id??null,
-        nodes:d.nodes??[], edges:d.edges??[], sources:d.sources??[], agents:d.agents??[],
-        experiments:d.experiments??[], memories:d.memories??[], activities:d.activities??[],
+        workspaces, memberships,
+        activeWs:d.activeWs??workspaces[0]?.id??null,
+        nodes:[...(d.nodes??[]),...(demo?.nodes??[])],
+        edges:[...(d.edges??[]),...(demo?.edges??[])],
+        sources:[...(d.sources??[]),...(demo?.sources??[])],
+        agents:[...(d.agents??[]),...(demo?.agents??[])],
+        experiments:[...(d.experiments??[]),...(demo?.experiments??[])],
+        memories:[...(d.memories??[]),...(demo?.memories??[])],
+        activities:[...(d.activities??[]),...(demo?.acts??[])],
         invites:d.invites??[], exports:d.exports??[], searchLogs:d.searchLogs??[],
-        cloudReady:true,
+        demoSeeded:Boolean(d.demoSeeded||hasDemo||demo), cloudReady:true,
       });
+      if(demo) get().toast("Demo workspace added — explore it or create your own.");
     }catch{
       set({cloudReady:true});
       get().toast("Cloud snapshot could not be read — starting empty.");
@@ -99,7 +116,7 @@ export const useStore = create<State>()(persist((set,get)=>({
     const s=get();
     return JSON.stringify({
       app:"ResearchGraph",version:1,exportedAt:now(),
-      workspaces:s.workspaces,memberships:s.memberships,activeWs:s.activeWs,
+      workspaces:s.workspaces,memberships:s.memberships,activeWs:s.activeWs,demoSeeded:s.demoSeeded,
       nodes:s.nodes,edges:s.edges,sources:s.sources,agents:s.agents,
       experiments:s.experiments,memories:s.memories,activities:s.activities,
       invites:s.invites,exports:s.exports,searchLogs:s.searchLogs,
@@ -112,7 +129,7 @@ export const useStore = create<State>()(persist((set,get)=>({
       if(!rawWs.length) throw new Error("no workspaces in snapshot");
       const userId=get().sessionUserId;
       const ids=new Set(rawWs.map(w=>w.id));
-      const workspaces=rawWs.map(w=>({...w,ownerId:w.ownerId||userId||"",demo:false}));
+      const workspaces=rawWs.map(w=>({...w,ownerId:w.ownerId||userId||""}));
       const memberships=(Array.isArray(d.memberships)?d.memberships as Membership[]:[]).filter(m=>ids.has(m.workspaceId));
       if(userId){
         const mine=new Set(memberships.filter(m=>m.userId===userId).map(m=>m.workspaceId));
@@ -121,7 +138,7 @@ export const useStore = create<State>()(persist((set,get)=>({
       const arr=<T>(v:unknown):T[]=>Array.isArray(v)?v as T[]:[];
       const activeWs=typeof d.activeWs==="string"&&ids.has(d.activeWs)?d.activeWs:workspaces[0].id;
       set({
-        workspaces,memberships,activeWs,
+        workspaces,memberships,activeWs,demoSeeded:true,
         nodes:arr(d.nodes),edges:arr(d.edges),sources:arr(d.sources),agents:arr(d.agents),
         experiments:arr(d.experiments),memories:arr(d.memories),activities:arr(d.activities),
         invites:arr(d.invites),exports:arr(d.exports),searchLogs:arr(d.searchLogs),
@@ -141,6 +158,32 @@ export const useStore = create<State>()(persist((set,get)=>({
     get().toast("Workspace created.");
   },
   switchWs:(id)=>set({activeWs:id}),
+  deleteWorkspace:(id)=>{
+    const s=get();
+    const ws=s.workspaces.find(w=>w.id===id);
+    if(!ws) return;
+    if(ws.ownerId!==s.sessionUserId){ s.toast("Only the workspace owner can delete it."); return; }
+    const keep=<T extends {workspaceId:string}>(arr:T[])=>arr.filter(x=>x.workspaceId!==id);
+    let workspaces=s.workspaces.filter(w=>w.id!==id);
+    let memberships=s.memberships.filter(m=>m.workspaceId!==id);
+    let activeWs=s.activeWs===id ? (workspaces.find(w=>w.demo)?.id??workspaces[0]?.id??null) : s.activeWs;
+    let fresh=false;
+    if(!workspaces.length && s.sessionUserId){
+      const nw:Workspace={id:uid("ws"),name:"My workspace",description:"",ownerId:s.sessionUserId,createdAt:now()};
+      workspaces=[nw];
+      memberships=[{workspaceId:nw.id,userId:s.sessionUserId,role:"owner"}];
+      activeWs=nw.id;
+      fresh=true;
+    }
+    set({
+      workspaces,memberships,activeWs,
+      nodes:keep(s.nodes),edges:keep(s.edges),sources:keep(s.sources),agents:keep(s.agents),
+      experiments:keep(s.experiments),memories:keep(s.memories),activities:keep(s.activities),
+      invites:keep(s.invites),exports:keep(s.exports),searchLogs:keep(s.searchLogs),
+    });
+    if(activeWs) get().log(activeWs,"workspace",`Workspace deleted: ${ws.name}`);
+    get().toast(fresh?"Workspace deleted — created a fresh workspace.":"Workspace deleted.");
+  },
   applySharedSync:(input)=>{
     const sharedIds=new Set(input.workspaces.map(w=>w.workspaceId));
     set(s=>{

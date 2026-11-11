@@ -5,6 +5,7 @@ import { useStore } from "../lib/store";
 import { download } from "../lib/export";
 import { flushCloud } from "../lib/useCloudSync";
 import Analyst from "./Analyst";
+import { Modal } from "./ui";
 import { LogoMark } from "./Logo";
 import { navIcons } from "./icons";
 
@@ -25,12 +26,16 @@ export default function Shell({children}:{children:React.ReactNode}){
   const ws=useStore(s=>s.workspaces.find(w=>w.id===s.activeWs));
   const wss=useStore(s=>s.workspaces); const sw=useStore(s=>s.switchWs);
   const user=useStore(s=>s.users.find(u=>u.id===s.sessionUserId));
+  const createWorkspace=useStore(s=>s.createWorkspace);
+  const deleteWorkspace=useStore(s=>s.deleteWorkspace);
   const { signOut } = useAuthActions();
   const allAgents=useStore(s=>s.agents); const agents=allAgents.filter(a=>a.workspaceId===activeWsId);
   const toasts=useStore(s=>s.toasts);
   const pending=agents.filter(a=>a.status==="waiting_approval").length;
   const nav=useNavigate(); const [open,setOpen]=useState(false);
   const [q,setQ]=useState("");
+  const [manageOpen,setManageOpen]=useState(false);
+  const [wsName,setWsName]=useState("");
   const snapshotRef=useRef<HTMLInputElement>(null);
   const initials=(user?.name||"R").split(/\s+/).map(p=>p[0]).slice(0,2).join("").toUpperCase();
   const closeMenu=()=>document.querySelector<HTMLDetailsElement>("details.rg-profile[open]")?.removeAttribute("open");
@@ -74,7 +79,7 @@ export default function Shell({children}:{children:React.ReactNode}){
       </nav>
       <div className="rg-side-foot">
         <select className="rg-ws" value={ws?.id||""} onChange={e=>sw(e.target.value)} aria-label="Workspace">
-          {wss.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
+          {wss.map(w=><option key={w.id} value={w.id}>{w.name}{w.demo?" · Demo":""}</option>)}
         </select>
         <button className="rg-side-logout" onClick={endSession}>Log out</button>
       </div>
@@ -108,9 +113,10 @@ export default function Shell({children}:{children:React.ReactNode}){
               <label className="rg-profile-ws">
                 <span>Workspace</span>
                 <select value={ws?.id||""} onChange={e=>sw(e.target.value)}>
-                  {wss.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
+                  {wss.map(w=><option key={w.id} value={w.id}>{w.name}{w.demo?" · Demo":""}</option>)}
                 </select>
               </label>
+              <button onClick={()=>{closeMenu();setManageOpen(true);}}>Manage workspaces</button>
               <Link to="/app/collaboration" onClick={()=>{closeMenu();setOpen(false);}}>Share workspace</Link>
               <button onClick={exportWorkspace}>Export workspace (.json)</button>
               <button onClick={()=>{closeMenu();snapshotRef.current?.click();}}>Import workspace (.json)</button>
@@ -129,7 +135,7 @@ export default function Shell({children}:{children:React.ReactNode}){
         </NavLink>)}
         <div className="rg-mobile-foot">
           <select className="rg-ws" value={ws?.id||""} onChange={e=>sw(e.target.value)} aria-label="Workspace">
-            {wss.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
+            {wss.map(w=><option key={w.id} value={w.id}>{w.name}{w.demo?" · Demo":""}</option>)}
           </select>
           <button onClick={endSession}>Log out</button>
         </div>
@@ -137,6 +143,30 @@ export default function Shell({children}:{children:React.ReactNode}){
       <main id="main" className="rg-content">{children}</main>
     </div>
     <Analyst/>
+    {manageOpen && <Modal onClose={()=>setManageOpen(false)}>
+      <div className="rg-wsm">
+        <h3>Workspaces</h3>
+        <p>Each workspace keeps its own graph, sources, runs and memory. The demo workspace is yours to explore.</p>
+        <div className="rg-wsm-list">
+          {wss.map(w=>{
+            const owner=w.ownerId===user?.id;
+            return <div className={`rg-wsm-row${w.id===ws?.id?" on":""}`} key={w.id}>
+              <button className="rg-wsm-pick" onClick={()=>{sw(w.id);setManageOpen(false);}}>
+                <b>{w.name}{w.demo&&<span className="rg-wsm-demo">Demo</span>}</b>
+                <span>{w.id===ws?.id?"Active workspace":"Switch to this workspace"}</span>
+              </button>
+              {owner&&<button className="rg-wsm-del" onClick={()=>{
+                if(window.confirm(`Delete “${w.name}”? Its graph, sources, runs and memory will be removed.`)) { deleteWorkspace(w.id); void flushCloud(); }
+              }}>Delete</button>}
+            </div>;
+          })}
+        </div>
+        <form className="rg-wsm-create" onSubmit={e=>{e.preventDefault(); if(!wsName.trim()) return; createWorkspace(wsName.trim(),""); setWsName(""); setManageOpen(false);}}>
+          <input className="input" value={wsName} onChange={e=>setWsName(e.target.value)} placeholder="New workspace name" aria-label="New workspace name"/>
+          <button className="btn btn-primary btn-sm" disabled={!wsName.trim()}>Create</button>
+        </form>
+      </div>
+    </Modal>}
     <div className="toastwrap" aria-live="polite">{toasts.map((m,i)=><div key={i} className="toast">{m}</div>)}</div>
   </div>;
 }

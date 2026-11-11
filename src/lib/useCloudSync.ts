@@ -19,6 +19,7 @@ function serialize() {
     workspaces: s.workspaces,
     memberships: s.memberships,
     activeWs: s.activeWs,
+    demoSeeded: s.demoSeeded,
     nodes: localOnly(s.nodes),
     edges: localOnly(s.edges),
     sources: localOnly(s.sources),

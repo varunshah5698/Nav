@@ -123,7 +123,7 @@ export default function Landing() {
         <div className="lp-hero-in">
           <span className="lp-eyebrow">
             <i aria-hidden="true" />
-            Starts empty · bring your own sources
+            Demo workspace included · no setup
           </span>
 
           <h1 className="lp-h1">
@@ -391,8 +391,8 @@ elapsed 00:04:12`}</div>
             <span className="lp-kicker onDark"><b>↗</b> Start here</span>
             <h2>Stop losing context.</h2>
             <p>
-              Start with a blank workspace and bring your own papers, datasets and runs — or
-              import a workspace snapshot you exported earlier.
+              Start with a labelled demo workspace, then bring your own papers, datasets and
+              runs — or import a workspace snapshot you exported earlier.
             </p>
             <div className="lp-cta">
               <Link className="lp-btn lp-btn-lime" to="/register">
