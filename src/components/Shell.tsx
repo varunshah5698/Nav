@@ -1,6 +1,8 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { useStore } from "../lib/store";
 import { download } from "../lib/export";
 import { flushCloud } from "../lib/useCloudSync";
@@ -28,6 +30,7 @@ export default function Shell({children}:{children:React.ReactNode}){
   const user=useStore(s=>s.users.find(u=>u.id===s.sessionUserId));
   const createWorkspace=useStore(s=>s.createWorkspace);
   const deleteWorkspace=useStore(s=>s.deleteWorkspace);
+  const removeSharedWorkspace=useMutation(api.workspaceSync.remove);
   const { signOut } = useAuthActions();
   const allAgents=useStore(s=>s.agents); const agents=allAgents.filter(a=>a.workspaceId===activeWsId);
   const toasts=useStore(s=>s.toasts);
@@ -44,6 +47,15 @@ export default function Shell({children}:{children:React.ReactNode}){
     closeMenu();
     const name=(ws?.name||"workspace").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"workspace";
     download(`researchgraph-${name}-${new Date().toISOString().slice(0,10)}.json`, useStore.getState().exportSnapshot(), "application/json");
+  };
+  const removeWorkspace=async(w:{id:string;name:string;demo?:boolean})=>{
+    if(!window.confirm(`Delete “${w.name}”? Its graph, sources, runs and memory will be removed.`)) return;
+    if(!w.demo){
+      try { await removeSharedWorkspace({workspaceId:w.id}); }
+      catch(e){ useStore.getState().toast(e instanceof Error?e.message:"Could not delete workspace."); return; }
+    }
+    deleteWorkspace(w.id);
+    void flushCloud();
   };
   const importWorkspace=async(e:React.ChangeEvent<HTMLInputElement>)=>{
     const file=e.target.files?.[0]; e.target.value="";
@@ -155,9 +167,7 @@ export default function Shell({children}:{children:React.ReactNode}){
                 <b>{w.name}{w.demo&&<span className="rg-wsm-demo">Demo</span>}</b>
                 <span>{w.id===ws?.id?"Active workspace":"Switch to this workspace"}</span>
               </button>
-              {owner&&<button className="rg-wsm-del" onClick={()=>{
-                if(window.confirm(`Delete “${w.name}”? Its graph, sources, runs and memory will be removed.`)) { deleteWorkspace(w.id); void flushCloud(); }
-              }}>Delete</button>}
+              {owner&&<button className="rg-wsm-del" aria-label={`Delete ${w.name}`} onClick={()=>void removeWorkspace(w)}>Delete</button>}
             </div>;
           })}
         </div>
