@@ -1853,3 +1853,153 @@
     height: 260vh;
   }
 }
+
+/* ---------- static universe fallback (no WebGL / while loading) ---------- */
+.lp-universe-loading {
+  position: relative;
+  height: 300vh;
+  background: #080b0b;
+}
+
+.lp-u-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(48% 58% at 68% 46%, rgba(216, 248, 94, 0.10), transparent 65%),
+    radial-gradient(42% 54% at 32% 54%, rgba(156, 139, 229, 0.09), transparent 68%),
+    #080b0b;
+}
+
+.lp-u-fallback-glow {
+  position: absolute;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(216, 248, 94, 0.18), transparent 67%);
+  filter: blur(14px);
+}
+
+.lp-u-fallback-rings {
+  position: absolute;
+  width: min(580px, 78vw);
+  height: min(380px, 56vw);
+  perspective: 900px;
+  transform-style: preserve-3d;
+}
+
+.lp-u-fallback-rings i {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(216, 248, 94, 0.28);
+  border-radius: 50%;
+  transform: rotateX(64deg) rotateZ(-18deg);
+  animation: uOrbit 22s linear infinite;
+}
+
+.lp-u-fallback-rings i:nth-child(2) {
+  inset: 10% 8%;
+  border-color: rgba(156, 139, 229, 0.3);
+  transform: rotateX(68deg) rotateZ(24deg);
+  animation-duration: 29s;
+  animation-direction: reverse;
+}
+
+.lp-u-fallback-rings i:nth-child(3) {
+  inset: 22% 17%;
+  border-style: dashed;
+  border-color: rgba(237, 235, 230, 0.2);
+  transform: rotateX(60deg) rotateZ(-42deg);
+  animation-duration: 36s;
+}
+
+.lp-u-fallback-core {
+  position: relative;
+  width: 176px;
+  height: 176px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #f2ffb4 0%, #d8f85e 20%, #4c5a1d 57%, #0b100e 100%);
+  box-shadow:
+    0 0 70px rgba(216, 248, 94, 0.3),
+    inset -20px -24px 44px rgba(0, 0, 0, 0.62),
+    inset 10px 10px 24px rgba(255, 255, 255, 0.14);
+  animation: uCore 7s ease-in-out infinite;
+}
+
+.lp-u-fallback-core i {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(216, 248, 94, 0.27);
+}
+
+.lp-u-fallback-core i:first-child {
+  inset: -24px;
+}
+
+.lp-u-fallback-core i:last-child {
+  inset: -50px;
+  border-color: rgba(156, 139, 229, 0.24);
+  border-style: dashed;
+}
+
+.lp-u-fallback-node {
+  position: absolute;
+  left: calc(50% + var(--x));
+  top: calc(50% + var(--y));
+  width: var(--s);
+  height: var(--s);
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 12px var(--c), 0 0 26px color-mix(in srgb, var(--c) 45%, transparent);
+  animation: uNode 6s ease-in-out infinite;
+  animation-delay: var(--delay);
+}
+
+.lp-u-fallback-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(65% 65% at 64% 52%, #000, transparent 78%);
+  -webkit-mask-image: radial-gradient(65% 65% at 64% 52%, #000, transparent 78%);
+}
+
+@keyframes uCore {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+
+@keyframes uOrbit {
+  to { transform: rotateX(64deg) rotateZ(342deg); }
+}
+
+@keyframes uNode {
+  0%, 100% { transform: translateY(0); opacity: 0.8; }
+  50% { transform: translateY(-6px); opacity: 1; }
+}
+
+@media (max-width: 900px) {
+  .lp-universe-loading {
+    height: 260vh;
+  }
+
+  .lp-u-fallback-core {
+    width: 136px;
+    height: 136px;
+  }
+
+  .lp-u-fallback-rings {
+    width: 84vw;
+    height: 58vw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-u-fallback-core,
+  .lp-u-fallback-rings i,
+  .lp-u-fallback-node {
+    animation: none;
+  }
+}

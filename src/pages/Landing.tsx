@@ -19,7 +19,7 @@ function UniverseMount() {
           io.disconnect();
         }
       },
-      { rootMargin: "800px 0px" },
+      { rootMargin: "0px 0px -20% 0px" },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -29,7 +29,7 @@ function UniverseMount() {
       {ready ? (
         <Suspense
           fallback={
-            <div className="lp-universe-loading">
+            <div className="lp-universe-loading" id="universe">
               <div className="lp-universe-sticky"><UniverseFallback /></div>
             </div>
           }
@@ -37,7 +37,7 @@ function UniverseMount() {
           <ScrollUniverse />
         </Suspense>
       ) : (
-        <div className="lp-universe-loading">
+        <div className="lp-universe-loading" id="universe">
           <div className="lp-universe-sticky"><UniverseFallback /></div>
         </div>
       )}

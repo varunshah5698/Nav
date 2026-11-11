@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type ErrorInfo, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { MeshDistortMaterial } from "@react-three/drei";
+import UniverseFallback from "./UniverseFallback";
 import * as THREE from "three";
 
 const LIME = "#D8F85E";
@@ -50,7 +50,67 @@ function makeGlow() {
   return t;
 }
 
-type Node = { pos: THREE.Vector3; color: string; size: number };
+function makeLabel(text: string, color: string) {
+  const measure = document.createElement("canvas").getContext("2d")!;
+  const font = "700 26px Manrope, Inter, sans-serif";
+  measure.font = font;
+  const width = Math.ceil(measure.measureText(text.toUpperCase()).width) + 40;
+  const c = document.createElement("canvas");
+  c.width = Math.max(132, width);
+  c.height = 64;
+  const g = c.getContext("2d")!;
+  g.beginPath();
+  g.roundRect(2, 2, c.width - 4, c.height - 4, 16);
+  g.fillStyle = "rgba(8,11,11,.86)";
+  g.fill();
+  g.strokeStyle = color;
+  g.globalAlpha = 0.55;
+  g.lineWidth = 2;
+  g.stroke();
+  g.globalAlpha = 1;
+  g.fillStyle = "#EAF1DD";
+  g.font = font;
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(text.toUpperCase(), c.width / 2, c.height / 2 + 1);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return { texture: t, aspect: c.width / c.height };
+}
+
+function NodeLabel({ text, color, progress, position }: { text: string; color: string; progress: MutableRefObject<number>; position: [number, number, number] }) {
+  const { texture, aspect } = useMemo(() => makeLabel(text, color), [text, color]);
+  const sprite = useRef<THREE.Sprite>(null);
+  const mat = useRef<THREE.SpriteMaterial>(null);
+  const world = useRef(new THREE.Vector3());
+  const projected = useRef(new THREE.Vector3());
+  useEffect(() => () => texture.dispose(), [texture]);
+  useFrame(({ camera, size }) => {
+    if (!sprite.current || !mat.current) return;
+    sprite.current.getWorldPosition(world.current);
+    projected.current.copy(world.current).project(camera);
+    const x = (projected.current.x * 0.5 + 0.5) * size.width;
+    const y = (-projected.current.y * 0.5 + 0.5) * size.height;
+    const mobile = size.width < 760;
+    const safeX = mobile ? size.width * 0.05 : size.width * 0.43;
+    const minY = mobile ? size.height * 0.66 : size.height * 0.12;
+    const safe = projected.current.z < 1 && x > safeX && y > minY && y < size.height * 0.9;
+    const edge = clamp01((x - safeX) / (size.width * 0.08));
+    const reveal = clamp01((smooth(clamp01(progress.current)) - 0.28) / 0.3);
+    const target = safe ? Math.min(1, edge) * reveal * 0.75 : 0;
+    mat.current.opacity = THREE.MathUtils.lerp(mat.current.opacity, target, 0.12);
+    const distance = world.current.distanceTo(camera.position);
+    const base = Math.min(0.23, Math.max(0.1, distance * 0.036));
+    sprite.current.scale.set(base * aspect, base, 1);
+  });
+  return (
+    <sprite ref={sprite} position={position} scale={[0.2 * aspect, 0.2, 1]}>
+      <spriteMaterial ref={mat} map={texture} transparent opacity={0} depthWrite={false} toneMapped={false} />
+    </sprite>
+  );
+}
+
+type Node = { pos: THREE.Vector3; color: string; size: number; label?: string };
 
 function makeUniverse(count: number) {
   const rand = prng(19);
@@ -74,6 +134,10 @@ function makeUniverse(count: number) {
       size: 0.055 + rand() * 0.055,
     });
   }
+  ["Paper", "Dataset", "Result", "Fix"].forEach((label, i) => {
+    const n = nodes[(i * 7 + 3) % nodes.length];
+    if (n && !n.label) n.label = label;
+  });
 
 
   const pairs = new Set<string>();
@@ -144,6 +208,17 @@ function Dust({ glow, compact, reduced }: { glow: THREE.Texture; compact: boolea
   return <points ref={ref} geometry={geo} material={mat} />;
 }
 
+class SceneBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(_error: Error, _info: ErrorInfo) {}
+  render() {
+    return this.state.failed ? <UniverseFallback /> : this.props.children;
+  }
+}
+
 function UniverseScene({
   progress,
   pointer,
@@ -206,14 +281,12 @@ function UniverseScene({
         </sprite>
         <mesh>
           <icosahedronGeometry args={[0.55, 8]} />
-          <MeshDistortMaterial
+          <meshStandardMaterial
             color="#0B100E"
             emissive={LIME}
             emissiveIntensity={0.035}
             metalness={0.95}
             roughness={0.14}
-            distort={reduced ? 0 : 0.28}
-            speed={reduced ? 0 : 1.2}
           />
         </mesh>
         <mesh scale={1.22}>
@@ -245,6 +318,7 @@ function UniverseScene({
             <sprite scale={[n.size * 10, n.size * 10, 1]}>
               <spriteMaterial map={glow} color={n.color} transparent opacity={0.5} depthWrite={false} blending={THREE.AdditiveBlending} />
             </sprite>
+            {n.label && <NodeLabel text={n.label} color={n.color} progress={progress} position={[n.pos.x * 0.2, n.pos.y * 0.2 + 0.28, n.pos.z * 0.2]} />}
           </group>
         ))}
       </group>
@@ -262,6 +336,16 @@ export default function ScrollUniverse() {
   const [inView, setInView] = useState(false);
   const [compact, setCompact] = useState(false);
   const [reduced, setReduced] = useState(false);
+  const [webgl, setWebgl] = useState(false);
+
+  useEffect(() => {
+    try {
+      const c = document.createElement("canvas");
+      setWebgl(Boolean(c.getContext("webgl2") || c.getContext("webgl")));
+    } catch {
+      setWebgl(false);
+    }
+  }, []);
 
   useEffect(() => {
     const mqCompact = window.matchMedia("(max-width: 760px)");
@@ -322,14 +406,20 @@ export default function ScrollUniverse() {
     <section className="lp-universe" id="universe" ref={section} onPointerMove={onPointer}>
       <div className="lp-universe-sticky">
         <div className="lp-universe-stage" aria-hidden="true">
-          <Canvas
-            dpr={[1, compact ? 1.35 : 1.6]}
-            camera={{ position: [0, 0.55, 7.6], fov: compact ? 54 : 46 }}
-            gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
-            frameloop={inView ? "always" : "never"}
-          >
-            <UniverseScene progress={progress} pointer={pointer} compact={compact} reduced={reduced} />
-          </Canvas>
+          {webgl ? (
+            <SceneBoundary>
+              <Canvas
+                dpr={[1, compact ? 1.35 : 1.6]}
+                camera={{ position: [0, 0.55, 7.6], fov: compact ? 54 : 46 }}
+                gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
+                frameloop={inView ? "always" : "never"}
+              >
+                <UniverseScene progress={progress} pointer={pointer} compact={compact} reduced={reduced} />
+              </Canvas>
+            </SceneBoundary>
+          ) : (
+            <UniverseFallback />
+          )}
         </div>
         <div className="lp-universe-scrim" aria-hidden="true" />
         <div className="lp-universe-inner">
