@@ -1,7 +1,8 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useStore } from "../lib/store";
+import { download } from "../lib/export";
 import { flushCloud } from "../lib/useCloudSync";
 import Analyst from "./Analyst";
 import { LogoMark } from "./Logo";
@@ -30,9 +31,21 @@ export default function Shell({children}:{children:React.ReactNode}){
   const pending=agents.filter(a=>a.status==="waiting_approval").length;
   const nav=useNavigate(); const [open,setOpen]=useState(false);
   const [q,setQ]=useState("");
+  const snapshotRef=useRef<HTMLInputElement>(null);
   const initials=(user?.name||"R").split(/\s+/).map(p=>p[0]).slice(0,2).join("").toUpperCase();
   const closeMenu=()=>document.querySelector<HTMLDetailsElement>("details.rg-profile[open]")?.removeAttribute("open");
   const endSession=async()=>{ closeMenu(); await flushCloud(); await signOut(); nav("/login"); };
+  const exportWorkspace=()=>{
+    closeMenu();
+    const name=(ws?.name||"workspace").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"workspace";
+    download(`researchgraph-${name}-${new Date().toISOString().slice(0,10)}.json`, useStore.getState().exportSnapshot(), "application/json");
+  };
+  const importWorkspace=async(e:React.ChangeEvent<HTMLInputElement>)=>{
+    const file=e.target.files?.[0]; e.target.value="";
+    if(!file) return;
+    useStore.getState().importSnapshot(await file.text());
+    closeMenu(); setOpen(false); nav("/app/dashboard");
+  };
 
   useEffect(()=>{
     const onDown=(e:MouseEvent)=>{
@@ -61,7 +74,7 @@ export default function Shell({children}:{children:React.ReactNode}){
       </nav>
       <div className="rg-side-foot">
         <select className="rg-ws" value={ws?.id||""} onChange={e=>sw(e.target.value)} aria-label="Workspace">
-          {wss.map(w=><option key={w.id} value={w.id}>{w.name}{w.demo?" (Demo)":""}</option>)}
+          {wss.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
         <button className="rg-side-logout" onClick={endSession}>Log out</button>
       </div>
@@ -95,13 +108,16 @@ export default function Shell({children}:{children:React.ReactNode}){
               <label className="rg-profile-ws">
                 <span>Workspace</span>
                 <select value={ws?.id||""} onChange={e=>sw(e.target.value)}>
-                  {wss.map(w=><option key={w.id} value={w.id}>{w.name}{w.demo?" (Demo)":""}</option>)}
+                  {wss.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
               </label>
               <Link to="/app/collaboration" onClick={()=>{closeMenu();setOpen(false);}}>Share workspace</Link>
+              <button onClick={exportWorkspace}>Export workspace (.json)</button>
+              <button onClick={()=>{closeMenu();snapshotRef.current?.click();}}>Import workspace (.json)</button>
               <button onClick={endSession}>Log out</button>
             </div>
           </details>
+          <input ref={snapshotRef} type="file" accept="application/json,.json" hidden onChange={importWorkspace}/>
           <button className="menubtn" aria-label="Menu" aria-expanded={open} aria-controls="rg-mobile-nav" onClick={()=>setOpen(!open)}>{navIcons.menu}</button>
         </div>
       </header>
@@ -113,7 +129,7 @@ export default function Shell({children}:{children:React.ReactNode}){
         </NavLink>)}
         <div className="rg-mobile-foot">
           <select className="rg-ws" value={ws?.id||""} onChange={e=>sw(e.target.value)} aria-label="Workspace">
-            {wss.map(w=><option key={w.id} value={w.id}>{w.name}{w.demo?" (Demo)":""}</option>)}
+            {wss.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
           <button onClick={endSession}>Log out</button>
         </div>

@@ -127,7 +127,7 @@ export function buildAnalystContext(
 
   const ready = sources.filter((s) => s.status === "ready").length;
   const head = [
-    `WORKSPACE: ${ws?.name || "Untitled"}${ws?.demo ? " (DEMO data — all records are labelled demonstrations)" : ""}`,
+    `WORKSPACE: ${ws?.name || "Untitled"}`,
     ws?.description ? `PURPOSE: ${clip(ws.description, 240)}` : "",
     `SNAPSHOT: ${sources.length} sources (${ready} ready) · ${nodes.length} nodes · ${edges.length} edges · ${runs.length} experiment runs · ${memories.length} memory records`,
   ]

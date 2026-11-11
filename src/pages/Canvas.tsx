@@ -329,7 +329,7 @@ export default function Canvas() {
         <div>
           <div className="cv-eyebrow">
             <span>{ws?.name || "Workspace"}</span>
-            {ws?.demo && <><i className="sep" /><span>Demo data</span></>}
+
           </div>
           <h1 className="cv-h1">Research canvas</h1>
           <p className="cv-sub">Arrange the evidence left to right, then read the graph beside it.</p>

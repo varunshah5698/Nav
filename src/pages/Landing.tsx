@@ -1,9 +1,49 @@
 import { Link } from "react-router-dom";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import Constellation from "../components/Constellation";
 import { LogoMark } from "../components/Logo";
 import ConnectionGraph from "../components/ConnectionGraph";
+import UniverseFallback from "../components/UniverseFallback";
 const ScrollUniverse = lazy(() => import("../components/ScrollUniverse"));
+
+function UniverseMount() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setReady(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "800px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div ref={ref}>
+      {ready ? (
+        <Suspense
+          fallback={
+            <div className="lp-universe-loading">
+              <div className="lp-universe-sticky"><UniverseFallback /></div>
+            </div>
+          }
+        >
+          <ScrollUniverse />
+        </Suspense>
+      ) : (
+        <div className="lp-universe-loading">
+          <div className="lp-universe-sticky"><UniverseFallback /></div>
+        </div>
+      )}
+    </div>
+  );
+}
 import "../styles/landing.css";
 
 const NAV = [
@@ -122,7 +162,7 @@ export default function Landing() {
         <div className="lp-hero-in">
           <span className="lp-eyebrow">
             <i aria-hidden="true" />
-            Demo workspace included · no setup
+            Starts empty · bring your own sources
           </span>
 
           <h1 className="lp-h1">
@@ -166,9 +206,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <Suspense fallback={<div className="lp-universe-fallback" aria-hidden="true" />}>
-        <ScrollUniverse />
-      </Suspense>
+      <UniverseMount />
 
       <div className="lp-ticker" aria-hidden="true">
         <div className="lp-ticker-track">
@@ -392,8 +430,8 @@ elapsed 00:04:12`}</div>
             <span className="lp-kicker onDark"><b>↗</b> Start here</span>
             <h2>Stop losing context.</h2>
             <p>
-              Start with the seeded PlantVillage workspace and explore every module, or bring your
-              own papers. Demo data is labelled everywhere.
+              Start with a blank workspace and bring your own papers, datasets and runs — or
+              import a workspace snapshot you exported earlier.
             </p>
             <div className="lp-cta">
               <Link className="lp-btn lp-btn-lime" to="/register">
@@ -434,7 +472,7 @@ elapsed 00:04:12`}</div>
               <b>Account</b>
               <Link to="/login">Log in</Link>
               <Link to="/register">Create workspace</Link>
-              <span>Demo researcher</span>
+              <span>Researcher</span>
             </div>
           </div>
           <div className="lp-foot-bottom">

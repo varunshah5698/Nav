@@ -219,8 +219,7 @@ export default function Experiments() {
         <div className="xh-hero-copy">
           <div className="xh-eyebrow">
             <i /> Experiment lab
-            <span>{(ws?.name || "Workspace").replace(" (Demo)", "")}</span>
-            {ws?.demo && <em>Demo data</em>}
+            <span>{ws?.name || "Workspace"}</span>
           </div>
           <h1>Where plans become <span className="xh-serif">evidence.</span></h1>
           <p className="xh-sub">
@@ -669,7 +668,7 @@ function Wizard({ onClose, onAdd }: { onClose: () => void; onAdd: (v: Record<str
               deps: ["torch==2.1.0", "torchvision==0.16.0", "pillow==9.5.0"],
               env: { python: "3.10", framework: "pytorch-cpu" },
               plan: "CPU run, save best checkpoint, log validation metrics.",
-              expected: "~90% validation accuracy at demo scale.",
+              expected: "~90% validation accuracy at this scale.",
             })}>Create draft</button>
           <button className="xh-btn ghost" onClick={onClose}>Cancel</button>
         </footer>

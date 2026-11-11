@@ -309,7 +309,7 @@ export default function Analyst() {
               <span className="an-orb">✦</span>
               <div className="an-profile-id">
                 <b>Research Analyst</b>
-                <span>{ws?.name || "Workspace"}{ws?.demo ? " · demo" : ""}</span>
+                <span>{ws?.name || "Workspace"}</span>
               </div>
               <span className={`an-profile-dot${ready ? " live" : ""}`} aria-hidden />
             </div>
@@ -387,7 +387,7 @@ export default function Analyst() {
             <div className="an-bar-left">
               <span className="an-live-dot" />
               <b>{ws?.name || "Workspace"}</b>
-              {ws?.demo && <span className="an-tag">demo data</span>}
+
             </div>
             <div className="an-bar-right">
               <span>

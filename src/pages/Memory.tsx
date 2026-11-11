@@ -102,7 +102,7 @@ export default function Memory() {
   const coverage = errors.length ? Math.round(Math.min(fixes.length, errors.length) / errors.length * 100) : 0;
   const fixWords = new Set(fixes.flatMap(m => words(m.title + " " + m.description + " " + (m.fix || ""))));
   const unresolved = errors.filter(m => { const w = words(m.title + " " + (m.error || "")); return !w.some(x => fixWords.has(x)); });
-  const tags = new Set(mems.flatMap(m => m.tags.filter(t => t !== "demo")));
+  const tags = new Set(mems.flatMap(m => m.tags));
   const reusedCount = mems.filter(m => m.reuseCount > 0).length;
   const reuseRate = mems.length ? Math.round(reusedCount / mems.length * 100) : 0;
   const resolution = errors.length ? Math.round((errors.length - unresolved.length) / errors.length * 100) : 100;
@@ -282,7 +282,7 @@ export default function Memory() {
                 <div className="mm-meta">
                   <span>{ago(m.createdAt)}</span>
                   {expName(m.experimentId) && <span className="mm-src">from {expName(m.experimentId)}</span>}
-                  {m.tags.filter(t => t !== "demo").map(t => <span key={t} className="mm-tag">#{t}</span>)}
+                  {m.tags.map(t => <span key={t} className="mm-tag">#{t}</span>)}
                 </div>
                 <div className="mm-card-foot">
                   <button className="mm-btn ghost sm" onClick={() => { reuse(m.id); toast(`Marked “${m.title}” as reused.`); }}>

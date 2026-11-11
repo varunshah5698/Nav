@@ -328,7 +328,6 @@ export default function Collaboration() {
   }, [_members, activeWs]);
 
   const setRole = useStore((s) => s.setRole);
-  const promoteDemoWorkspace = useStore((s) => s.promoteDemoWorkspace);
   const addExport = useStore((s) => s.addExport);
   const canManage = useStore((s) => s.isOwner);
 
@@ -336,7 +335,6 @@ export default function Collaboration() {
   const registerAttachment = useMutation(api.attachments.register);
   const removeAttachment = useMutation(api.attachments.remove);
   const clearAttachments = useMutation(api.attachments.clear);
-  const reassignAttachments = useMutation(api.attachments.reassign);
   const ensureWorkspace = useMutation(api.workspaceSync.ensure);
   const setMemberRole = useMutation(api.workspaceSync.setRole);
   const createInvite = useAction(api.workspaceInvites.createAndSend);
@@ -560,19 +558,7 @@ export default function Collaboration() {
     try {
       let target = useStore.getState().workspaces.find((w) => w.id === activeWs);
       if (!target) throw new Error("Workspace not found");
-      if (target.demo) {
-        const oldId = target.id;
-        const newId = promoteDemoWorkspace(oldId);
-        target = await ensureSharedWorkspace(newId);
-        try {
-          await reassignAttachments({ from: oldId, to: newId });
-        } catch {
-          toast("Existing demo files could not be moved — re-attach them in the shared workspace.");
-        }
-        toast("This demo workspace is now shared.");
-      } else {
-        target = await ensureSharedWorkspace(target.id);
-      }
+      target = await ensureSharedWorkspace(target.id);
 
       const result = await createInvite({
         workspaceId: target.id,
@@ -618,10 +604,6 @@ export default function Collaboration() {
 
   const changeRole = async (userId: string, nextRole: "editor" | "viewer") => {
     if (!activeWs) return;
-    if (ws?.demo) {
-      setRole(activeWs, userId, nextRole);
-      return;
-    }
     try {
       await setMemberRole({ workspaceId: activeWs, userId: userId as Id<"users">, role: nextRole });
       setRole(activeWs, userId, nextRole);
@@ -827,8 +809,7 @@ export default function Collaboration() {
           <div className="shx-eyebrow">
             <i aria-hidden="true" />
             <span>Distribution</span>
-            <span>{(ws?.name || "Workspace").replace(" (Demo)", "")}</span>
-            {ws?.demo && <em>Demo data</em>}
+            <span>{ws?.name || "Workspace"}</span>
           </div>
           <h1>
             Share the work, <span className="shx-serif">not the keys.</span>

@@ -81,7 +81,7 @@ export function useCloudSync() {
     if (remote && remote.userId !== me.id) return;
     hydratedRef.current = me.id;
     if (remote) useStore.getState().loadSnapshot(remote.payload);
-    else useStore.getState().seedFor(me.id);
+    else useStore.getState().initFor(me.id);
   }, [me, remote]);
 
   // Debounced pushes, only while authenticated and hydrated.

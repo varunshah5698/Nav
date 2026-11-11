@@ -143,7 +143,7 @@ export default function Sources(){
     <header className="src-head">
       <div className="src-head-top">
         <div>
-          <div className="src-eyebrow"><span>{ws?.name||"Workspace"}</span>{ws?.demo&&<><i className="sep"/><span>Demo data</span></>}</div>
+          <div className="src-eyebrow"><span>{ws?.name||"Workspace"}</span></div>
           <h1 className="src-h1">Source library</h1>
         </div>
         <nav className="src-tabs" aria-label="Filter sources by status">
@@ -393,7 +393,7 @@ function SourceSheet({source:s,onClose}:{source:Source;onClose:()=>void}){
         </section>}
         <section className="src-sec">
           <h4>Provenance</h4>
-          <p className="muted">Text was extracted locally from the uploaded document; methodology is recorded on the linked graph node {s.nodeId||"(pending)"}. Demo records still need field validation before they are used as evidence.</p>
+          <p className="muted">Text was extracted locally from the uploaded document; methodology is recorded on the linked graph node {s.nodeId||"(pending)"}. Records still need validation before they are used as evidence.</p>
         </section>
       </div>
       <footer className="src-sheet-foot">

@@ -115,7 +115,7 @@ function Frame({ mode, title, sub, children }: { mode: Mode; title: string; sub:
   const hero =
     mode === "login"
       ? { eyebrow: "Research workspace", lead: <>Pick up where your <em>graph</em> left off.</>, blurb: "Sign in to reconnect every paper, dataset, agent run and result you have already mapped." }
-      : { eyebrow: "New workspace", lead: <>Start your research <em>universe</em>.</>, blurb: "One connected graph for papers, datasets, agents and reproducible experiments — seeded with a labelled demo." };
+      : { eyebrow: "New workspace", lead: <>Start your research <em>universe</em>.</>, blurb: "One connected graph for papers, datasets, agents and reproducible experiments — start empty and bring your first source." };
 
   return (
     <div className="auth">

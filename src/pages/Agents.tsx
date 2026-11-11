@@ -231,7 +231,7 @@ export default function Agents() {
       <div className="hza-head-copy">
         <div className="hza-eyebrow">
           <span className="hza-eyebrow-ws"><i />{ws?.name || "Workspace"}</span>
-          {ws?.demo && <span className="hza-eyebrow-demo">Demo data</span>}
+
         </div>
         <h1>Agent control room</h1>
         <p>Delegate one instruction, then watch the Controller route it. Consequential steps stop here until you approve them.</p>

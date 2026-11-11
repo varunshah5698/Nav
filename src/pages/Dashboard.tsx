@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useStore } from "../lib/store";
+import { download } from "../lib/export";
 import { Badge, Empty, Modal } from "../components/ui";
 import { Donut, Growth, RankBars, RunBars } from "../components/Charts";
 import { approvalRate, describe, graphMetrics, median, pct } from "../lib/analytics";
@@ -68,6 +69,15 @@ export default function Dashboard(){
   const [tab,setTab]=useState("overview");
   const [open,setOpen]=useState(false);
   const [draft,setDraft]=useState({name:"",desc:""});
+  const snapshotRef=useRef<HTMLInputElement>(null);
+  const exportWorkspace=()=>{
+    const name=(ws?.name||"workspace").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"workspace";
+    download(`researchgraph-${name}-${new Date().toISOString().slice(0,10)}.json`, useStore.getState().exportSnapshot(), "application/json");
+  };
+  const importWorkspace=async(e:React.ChangeEvent<HTMLInputElement>)=>{
+    const file=e.target.files?.[0]; e.target.value="";
+    if(file) useStore.getState().importSnapshot(await file.text());
+  };
 
   const days=range==="7d"?7:range==="30d"?30:90;
   const now=Date.now();
@@ -198,7 +208,7 @@ export default function Dashboard(){
     <header className="db-head">
       <div className="db-head-top">
         <div>
-          <div className="db-eyebrow"><span>{ws?.name||"Workspace"}</span>{ws?.demo&&<><i className="sep"/><span>Demo data</span></>}</div>
+          <div className="db-eyebrow"><span>{ws?.name||"Workspace"}</span></div>
           <h1 className="db-h1">Research cabinet</h1>
         </div>
         <div className="db-head-actions">
@@ -206,6 +216,9 @@ export default function Dashboard(){
             {[["overview","db-overview","My cabinet"],["corpus","db-corpus","Corpus"],["statistics","db-statistics","Statistics"]].map(([key,id,label])=>
               <button key={key} className={tab===key?"on":""} aria-pressed={tab===key} onClick={()=>jump(id,key)}>{label}</button>)}
           </nav>
+          <button className="db-ghost" onClick={()=>snapshotRef.current?.click()} title="Import a workspace snapshot (.json)">Import</button>
+          <button className="db-ghost" onClick={exportWorkspace} title="Export this workspace as a JSON snapshot">Export</button>
+          <input ref={snapshotRef} type="file" accept="application/json,.json" hidden onChange={importWorkspace}/>
           <button className="db-ghost" onClick={()=>setOpen(true)}>+ Workspace</button>
         </div>
       </div>
@@ -277,7 +290,7 @@ export default function Dashboard(){
             <span className="db-avatar">{initials}</span>
             <div>
               <b>{user?.name||"Researcher"}</b>
-              <span><i className="db-star" aria-hidden>★</i> {ws?.demo?"Demo workspace":"Owner"} · {memberCount} member{memberCount===1?"":"s"}</span>
+              <span><i className="db-star" aria-hidden>★</i> Owner · {memberCount} member{memberCount===1?"":"s"}</span>
             </div>
           </div>
           <dl className="db-info">

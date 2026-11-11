@@ -55,11 +55,6 @@
   font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#C9C3BB;
 }
 .hza-eyebrow-ws i{width:5px;height:5px;border-radius:50%;background:var(--hza-orange);box-shadow:0 0 0 3px rgba(243,112,63,.14);flex:none}
-.hza-eyebrow-demo{
-  display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;
-  background:rgba(242,182,75,.09);border:1px solid rgba(242,182,75,.22);
-  font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#E8C47C;
-}
 .hza-head h1{
   margin:13px 0 8px;font-size:31px;font-weight:800;line-height:1.04;
   letter-spacing:-.045em;color:var(--hza-ink);

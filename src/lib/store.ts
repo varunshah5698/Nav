@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Activity, AgentName, AgentRun, Edge, Experiment, Invite, MemoryEntry, RNode, SearchLog, Source, User, Workspace, Membership, ExportJob, SharedSyncInput } from "./types";
-import { seedDemo } from "./seed";
 import { chunkPages, leadOf, digestSource } from "./text";
 
 const uid=(p:string)=>p+"-"+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4);
@@ -17,12 +16,13 @@ interface State {
   // session (identity itself comes from Convex Auth, never from local storage)
   startSession:(u:User)=>void;
   clearSession:()=>void;
-  seedFor:(userId:string)=>void;
+  initFor:(userId:string)=>void;
   loadSnapshot:(payload:string)=>void;
+  exportSnapshot:()=>string;
+  importSnapshot:(payload:string)=>void;
   applySharedSync:(input:SharedSyncInput)=>void;
   // ws
   createWorkspace:(name:string,desc:string)=>void; switchWs:(id:string)=>void;
-  promoteDemoWorkspace:(id:string)=>string;
   canEdit:()=>boolean; isOwner:()=>boolean;
   // generic helpers
   toast:(m:string)=>void; log:(ws:string,kind:string,text:string,refType?:string,refId?:string)=>void;
@@ -50,10 +50,6 @@ interface State {
   addExport:(kind:string,format:string)=>void;
   logSearch:(ws:string,query:string,results:number,ms:number)=>void; markOpened:(ws:string)=>void;
 }
-function demoFor(userId:string){
-  const s=seedDemo(userId);
-  return s;
-}
 export const useStore = create<State>()(persist((set,get)=>({
   users:[], sessionUserId:null, cloudReady:false, workspaces:[], memberships:[], activeWs:null,
   nodes:[], edges:[], sources:[], agents:[], experiments:[], memories:[], activities:[],
@@ -73,20 +69,21 @@ export const useStore = create<State>()(persist((set,get)=>({
     nodes:[], edges:[], sources:[], agents:[], experiments:[], memories:[], activities:[],
     invites:[], exports:[], searchLogs:[],
   }),
-  seedFor:(userId)=>{
+  initFor:(userId)=>{
     if(get().workspaces.length){ set({cloudReady:true}); return; }
-    const s=demoFor(userId);
+    const ws:Workspace={id:uid("ws"),name:"My workspace",description:"",ownerId:userId,createdAt:now()};
     set({
-      workspaces:[s.ws], memberships:[{workspaceId:s.ws.id,userId,role:"owner"}], activeWs:s.ws.id,
-      nodes:s.nodes, edges:s.edges, sources:s.sources, experiments:s.experiments,
-      memories:s.memories, agents:s.agents, activities:s.acts, cloudReady:true,
+      workspaces:[ws], memberships:[{workspaceId:ws.id,userId,role:"owner"}], activeWs:ws.id,
+      nodes:[], edges:[], sources:[], experiments:[], memories:[], agents:[], activities:[],
+      invites:[], exports:[], searchLogs:[], cloudReady:true,
     });
+    get().log(ws.id,"workspace","Workspace created.");
   },
   loadSnapshot:(payload)=>{
     try{
       const d=JSON.parse(payload) as Partial<State>;
       set({
-        workspaces:d.workspaces??[], memberships:d.memberships??[],
+        workspaces:(d.workspaces??[]).map(w=>({...w,demo:false})), memberships:d.memberships??[],
         activeWs:d.activeWs??d.workspaces?.[0]?.id??null,
         nodes:d.nodes??[], edges:d.edges??[], sources:d.sources??[], agents:d.agents??[],
         experiments:d.experiments??[], memories:d.memories??[], activities:d.activities??[],
@@ -98,6 +95,44 @@ export const useStore = create<State>()(persist((set,get)=>({
       get().toast("Cloud snapshot could not be read — starting empty.");
     }
   },
+  exportSnapshot:()=>{
+    const s=get();
+    return JSON.stringify({
+      app:"ResearchGraph",version:1,exportedAt:now(),
+      workspaces:s.workspaces,memberships:s.memberships,activeWs:s.activeWs,
+      nodes:s.nodes,edges:s.edges,sources:s.sources,agents:s.agents,
+      experiments:s.experiments,memories:s.memories,activities:s.activities,
+      invites:s.invites,exports:s.exports,searchLogs:s.searchLogs,
+    },null,2);
+  },
+  importSnapshot:(payload)=>{
+    try{
+      const d=JSON.parse(payload) as Record<string,unknown>;
+      const rawWs=Array.isArray(d.workspaces)?d.workspaces as Workspace[]:[];
+      if(!rawWs.length) throw new Error("no workspaces in snapshot");
+      const userId=get().sessionUserId;
+      const ids=new Set(rawWs.map(w=>w.id));
+      const workspaces=rawWs.map(w=>({...w,ownerId:w.ownerId||userId||"",demo:false}));
+      const memberships=(Array.isArray(d.memberships)?d.memberships as Membership[]:[]).filter(m=>ids.has(m.workspaceId));
+      if(userId){
+        const mine=new Set(memberships.filter(m=>m.userId===userId).map(m=>m.workspaceId));
+        for(const w of workspaces) if(!mine.has(w.id)) memberships.push({workspaceId:w.id,userId,role:"owner"});
+      }
+      const arr=<T>(v:unknown):T[]=>Array.isArray(v)?v as T[]:[];
+      const activeWs=typeof d.activeWs==="string"&&ids.has(d.activeWs)?d.activeWs:workspaces[0].id;
+      set({
+        workspaces,memberships,activeWs,
+        nodes:arr(d.nodes),edges:arr(d.edges),sources:arr(d.sources),agents:arr(d.agents),
+        experiments:arr(d.experiments),memories:arr(d.memories),activities:arr(d.activities),
+        invites:arr(d.invites),exports:arr(d.exports),searchLogs:arr(d.searchLogs),
+        cloudReady:true,
+      });
+      get().toast(`Imported ${workspaces.length} workspace${workspaces.length===1?"":"s"}.`);
+      get().log(activeWs,"workspace","Workspace snapshot imported.");
+    }catch{
+      get().toast("That file is not a ResearchGraph workspace snapshot.");
+    }
+  },
   createWorkspace:(name,desc)=>{
     const u=get().sessionUserId; if(!u) return;
     const ws:Workspace={id:uid("ws"),name:name.trim()||"Untitled workspace",description:desc,ownerId:u,createdAt:now()};
@@ -106,22 +141,6 @@ export const useStore = create<State>()(persist((set,get)=>({
     get().toast("Workspace created.");
   },
   switchWs:(id)=>set({activeWs:id}),
-  promoteDemoWorkspace:(id)=>{
-    const src=get().workspaces.find(w=>w.id===id&&w.demo);
-    if(!src) return id;
-    const newId=uid("ws");
-    const remap=<T extends {workspaceId:string}>(arr:T[]):T[]=>arr.map(x=>x.workspaceId===id?{...x,workspaceId:newId}:x);
-    set(s=>({
-      workspaces:s.workspaces.map(w=>w.id===id?{...w,id:newId,demo:false}:w),
-      memberships:s.memberships.map(m=>m.workspaceId===id?{...m,workspaceId:newId}:m),
-      activeWs:s.activeWs===id?newId:s.activeWs,
-      nodes:remap(s.nodes), edges:remap(s.edges), sources:remap(s.sources), agents:remap(s.agents),
-      experiments:remap(s.experiments), memories:remap(s.memories), activities:remap(s.activities),
-      invites:remap(s.invites), exports:remap(s.exports), searchLogs:remap(s.searchLogs),
-    }));
-    get().log(newId,"workspace","Demo workspace promoted to a shared workspace.");
-    return newId;
-  },
   applySharedSync:(input)=>{
     const sharedIds=new Set(input.workspaces.map(w=>w.workspaceId));
     set(s=>{
@@ -326,12 +345,12 @@ function digestMode(agent:AgentName):"summary"|"equations"|"review"|null{
   return agent==="paper_reader"?"summary":agent==="equation"?"equations":agent==="review"?"review":null;
 }
 function mockOutput(agent:AgentName,task:string){
-  const base="(Demo output — inspect before use. AI inferences are labelled and need researcher review.)\n";
+  const base="(Simulated output — inspect before use. AI inferences are labelled and need researcher review.)\n";
   switch(agent){
     case "paper_reader": return base+"Contributions: (1) lightweight backbone comparison; (2) augmentation recipe; (3) public split. Method: transfer learning, RandAugment, cosine decay. Results: 94.1% reported (paper). Limitation: lab images only — see pp. 4–5.";
     case "equation": return base+"Softmax CE: L = −Σ y·log(ŷ). Cosine decay: η_t = η_min + ½(η_max−η_min)(1+cos πt/T). See methodology note.";
     case "code_setup": return base+"Deps: torch==2.1.0, torchvision==0.16.0, pillow==9.5.0. Setup: python -m venv .venv && pip install -r requirements.txt. Risk: pillow 10 breaks transforms.";
-    case "benchmark": return base+"Demo result 91.4% vs reported 94.1% (−2.7pp). Likely causes: 5 vs 50 epochs, CPU augmentations. No invented baselines — gap needs full-epoch run.";
+    case "benchmark": return base+"Simulated result 91.4% vs reported 94.1% (−2.7pp). Likely causes: 5 vs 50 epochs, CPU augmentations. No invented baselines — gap needs full-epoch run.";
     case "review": return base+"Evidence: good (2 sources cited). Gaps: field-photo validation missing; seed logged ✓. Claim 'viable <5MB' is supported for lab split only.";
     case "memory": return base+"Saved: config, error, fix. Reuse: pillow pin + CPU flag recommended for new runs.";
     default: return base+"Plan ready for "+task+". Approve to continue.";
