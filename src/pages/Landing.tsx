@@ -1,50 +1,11 @@
 import { Link } from "react-router-dom";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Constellation from "../components/Constellation";
 import { LogoMark } from "../components/Logo";
 import ConnectionGraph from "../components/ConnectionGraph";
-import UniverseFallback from "../components/UniverseFallback";
-const ScrollUniverse = lazy(() => import("../components/ScrollUniverse"));
-
-function UniverseMount() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setReady(true);
-          io.disconnect();
-        }
-      },
-      { rootMargin: "0px 0px -20% 0px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-  return (
-    <div ref={ref}>
-      {ready ? (
-        <Suspense
-          fallback={
-            <div className="lp-universe-loading" id="universe">
-              <div className="lp-universe-sticky"><UniverseFallback /></div>
-            </div>
-          }
-        >
-          <ScrollUniverse />
-        </Suspense>
-      ) : (
-        <div className="lp-universe-loading" id="universe">
-          <div className="lp-universe-sticky"><UniverseFallback /></div>
-        </div>
-      )}
-    </div>
-  );
-}
+import ScrollUniverse from "../components/ScrollUniverse";
 import "../styles/landing.css";
+
 
 const NAV = [
   { href: "#problem", label: "Problem" },
@@ -206,7 +167,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <UniverseMount />
+      <ScrollUniverse />
 
       <div className="lp-ticker" aria-hidden="true">
         <div className="lp-ticker-track">

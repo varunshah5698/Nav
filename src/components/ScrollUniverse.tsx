@@ -1,7 +1,4 @@
-import { Component, useEffect, useMemo, useRef, useState, type ErrorInfo, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import UniverseFallback from "./UniverseFallback";
-import * as THREE from "three";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 const LIME = "#D8F85E";
 const VIOLET = "#9C8BE5";
@@ -23,6 +20,9 @@ const STEPS = [
   },
 ];
 
+type V3 = { x: number; y: number; z: number };
+type Node = { pos: V3; color: string; size: number; label?: string };
+
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 const smooth = (v: number) => v * v * (3 - 2 * v);
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -35,102 +35,23 @@ function prng(seed: number) {
   };
 }
 
-function makeGlow() {
-  const c = document.createElement("canvas");
-  c.width = c.height = 128;
-  const g = c.getContext("2d")!;
-  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-  grad.addColorStop(0, "rgba(255,255,255,1)");
-  grad.addColorStop(0.22, "rgba(255,255,255,.55)");
-  grad.addColorStop(1, "rgba(255,255,255,0)");
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 128, 128);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-function makeLabel(text: string, color: string) {
-  const measure = document.createElement("canvas").getContext("2d")!;
-  const font = "700 26px Manrope, Inter, sans-serif";
-  measure.font = font;
-  const width = Math.ceil(measure.measureText(text.toUpperCase()).width) + 40;
-  const c = document.createElement("canvas");
-  c.width = Math.max(132, width);
-  c.height = 64;
-  const g = c.getContext("2d")!;
-  g.beginPath();
-  g.roundRect(2, 2, c.width - 4, c.height - 4, 16);
-  g.fillStyle = "rgba(8,11,11,.86)";
-  g.fill();
-  g.strokeStyle = color;
-  g.globalAlpha = 0.55;
-  g.lineWidth = 2;
-  g.stroke();
-  g.globalAlpha = 1;
-  g.fillStyle = "#EAF1DD";
-  g.font = font;
-  g.textAlign = "center";
-  g.textBaseline = "middle";
-  g.fillText(text.toUpperCase(), c.width / 2, c.height / 2 + 1);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return { texture: t, aspect: c.width / c.height };
-}
-
-function NodeLabel({ text, color, progress, position }: { text: string; color: string; progress: MutableRefObject<number>; position: [number, number, number] }) {
-  const { texture, aspect } = useMemo(() => makeLabel(text, color), [text, color]);
-  const sprite = useRef<THREE.Sprite>(null);
-  const mat = useRef<THREE.SpriteMaterial>(null);
-  const world = useRef(new THREE.Vector3());
-  const projected = useRef(new THREE.Vector3());
-  useEffect(() => () => texture.dispose(), [texture]);
-  useFrame(({ camera, size }) => {
-    if (!sprite.current || !mat.current) return;
-    sprite.current.getWorldPosition(world.current);
-    projected.current.copy(world.current).project(camera);
-    const x = (projected.current.x * 0.5 + 0.5) * size.width;
-    const y = (-projected.current.y * 0.5 + 0.5) * size.height;
-    const mobile = size.width < 760;
-    const safeX = mobile ? size.width * 0.05 : size.width * 0.43;
-    const minY = mobile ? size.height * 0.66 : size.height * 0.12;
-    const safe = projected.current.z < 1 && x > safeX && y > minY && y < size.height * 0.9;
-    const edge = clamp01((x - safeX) / (size.width * 0.08));
-    const reveal = clamp01((smooth(clamp01(progress.current)) - 0.28) / 0.3);
-    const target = safe ? Math.min(1, edge) * reveal * 0.75 : 0;
-    mat.current.opacity = THREE.MathUtils.lerp(mat.current.opacity, target, 0.12);
-    const distance = world.current.distanceTo(camera.position);
-    const base = Math.min(0.23, Math.max(0.1, distance * 0.036));
-    sprite.current.scale.set(base * aspect, base, 1);
-  });
-  return (
-    <sprite ref={sprite} position={position} scale={[0.2 * aspect, 0.2, 1]}>
-      <spriteMaterial ref={mat} map={texture} transparent opacity={0} depthWrite={false} toneMapped={false} />
-    </sprite>
-  );
-}
-
-type Node = { pos: THREE.Vector3; color: string; size: number; label?: string };
-
 function makeUniverse(count: number) {
   const rand = prng(19);
   const nodes: Node[] = [];
   const golden = Math.PI * (3 - Math.sqrt(5));
+  const palette = [LIME, VIOLET, ORANGE, PAPER];
   for (let i = 0; i < count; i++) {
     const y = 1 - (i / (count - 1)) * 2;
     const radius = Math.sqrt(Math.max(0, 1 - y * y));
     const theta = golden * i;
     const shell = 2.35 + (rand() - 0.5) * 0.7;
-    const pos = new THREE.Vector3(
-      Math.cos(theta) * radius * shell,
-      y * shell * 0.92,
-      Math.sin(theta) * radius * shell,
-    );
-    const palette = [LIME, VIOLET, PAPER, ORANGE];
-    const color = palette[i % palette.length];
-        nodes.push({
-      pos,
-      color: i % 9 === 0 ? ORANGE : color,
+    nodes.push({
+      pos: {
+        x: Math.cos(theta) * radius * shell,
+        y: y * shell * 0.92,
+        z: Math.sin(theta) * radius * shell,
+      },
+      color: i % 9 === 0 ? ORANGE : palette[i % palette.length],
       size: 0.055 + rand() * 0.055,
     });
   }
@@ -139,212 +60,110 @@ function makeUniverse(count: number) {
     if (n && !n.label) n.label = label;
   });
 
-
-  const pairs = new Set<string>();
+  const keys = new Set<string>();
   const edges: [number, number][] = [];
   const add = (a: number, b: number) => {
     if (a === b) return;
     const key = a < b ? `${a}-${b}` : `${b}-${a}`;
-    if (pairs.has(key)) return;
-    pairs.add(key);
+    if (keys.has(key)) return;
+    keys.add(key);
     edges.push([a, b]);
   };
   nodes.forEach((n, i) => {
-    const nearest = nodes
-      .map((m, j) => ({ j, d: n.pos.distanceToSquared(m.pos) }))
+    nodes
+      .map((m, j) => ({ j, d: (n.pos.x - m.pos.x) ** 2 + (n.pos.y - m.pos.y) ** 2 + (n.pos.z - m.pos.z) ** 2 }))
       .filter((x) => x.j !== i)
       .sort((a, b) => a.d - b.d)
-      .slice(0, 2);
-    nearest.forEach((ne) => add(i, ne.j));
+      .slice(0, 2)
+      .forEach(({ j }) => add(i, j));
   });
   for (let i = 0; i < nodes.length; i += 5) add(i, (i + 7) % nodes.length);
 
-  const positions = new Float32Array(edges.length * 6);
-  edges.forEach(([a, b], i) => {
-    const p = nodes[a].pos;
-    const q = nodes[b].pos;
-    positions.set([p.x, p.y, p.z, q.x, q.y, q.z], i * 6);
-  });
-  const edgeGeo = new THREE.BufferGeometry();
-  edgeGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-
-  return { nodes, edgeGeo };
+  return { nodes, edges };
 }
 
-function Dust({ glow, compact, reduced }: { glow: THREE.Texture; compact: boolean; reduced: boolean }) {
-  const ref = useRef<THREE.Points>(null);
-  const { geo, mat } = useMemo(() => {
-    const n = compact ? 320 : 760;
-    const rand = prng(71);
-    const arr = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) {
-      const r = 3.2 + rand() * 4.8;
-      const theta = rand() * Math.PI * 2;
-      const phi = Math.acos(rand() * 2 - 1);
-      arr[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      arr[i * 3 + 1] = r * Math.cos(phi) * 0.8;
-      arr[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(arr, 3));
-    const m = new THREE.PointsMaterial({
-      map: glow,
-      color: "#C8C2B8",
-      size: 0.045,
-      transparent: true,
-      opacity: 0.45,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      sizeAttenuation: true,
+function makeDust(count: number) {
+  const rand = prng(71);
+  const out: V3[] = [];
+  for (let i = 0; i < count; i++) {
+    const r = 3.2 + rand() * 4.8;
+    const theta = rand() * Math.PI * 2;
+    const phi = Math.acos(rand() * 2 - 1);
+    out.push({
+      x: r * Math.sin(phi) * Math.cos(theta),
+      y: r * Math.cos(phi) * 0.8,
+      z: r * Math.sin(phi) * Math.sin(theta),
     });
-    return { geo: g, mat: m };
-  }, [compact, glow]);
-  useFrame((s) => {
-    if (ref.current && !reduced) {
-      ref.current.rotation.y = s.clock.elapsedTime * 0.012;
-      ref.current.rotation.x = Math.sin(s.clock.elapsedTime * 0.08) * 0.08;
-    }
-  });
-  return <points ref={ref} geometry={geo} material={mat} />;
+  }
+  return out;
 }
 
-class SceneBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
+const PHI = (1 + Math.sqrt(5)) / 2;
+const CORE = (() => {
+  const raw: [number, number, number][] = [
+    [-1, PHI, 0], [1, PHI, 0], [-1, -PHI, 0], [1, -PHI, 0],
+    [0, -1, PHI], [0, 1, PHI], [0, -1, -PHI], [0, 1, -PHI],
+    [PHI, 0, -1], [PHI, 0, 1], [-PHI, 0, -1], [-PHI, 0, 1],
+  ];
+  const verts = raw.map(([x, y, z]) => {
+    const l = Math.hypot(x, y, z);
+    return { x: x / l, y: y / l, z: z / l };
+  });
+  const edges: [number, number][] = [];
+  for (let i = 0; i < verts.length; i++) {
+    for (let j = i + 1; j < verts.length; j++) {
+      const a = verts[i], b = verts[j];
+      if (Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) < 1.2) edges.push([i, j]);
+    }
   }
-  componentDidCatch(_error: Error, _info: ErrorInfo) {}
-  render() {
-    return this.state.failed ? <UniverseFallback /> : this.props.children;
-  }
+  return { verts, edges };
+})();
+
+const RING = Array.from({ length: 96 }, (_, i) => {
+  const a = (i / 96) * Math.PI * 2;
+  return { x: Math.cos(a), y: Math.sin(a), z: 0 };
+});
+
+function rotate(v: V3, ry: number, rx: number, rz: number) {
+  const cy = Math.cos(ry), sy = Math.sin(ry);
+  const x1 = v.x * cy - v.z * sy;
+  const z1 = v.x * sy + v.z * cy;
+  const cx = Math.cos(rx), sx = Math.sin(rx);
+  const y1 = v.y * cx - z1 * sx;
+  const z2 = v.y * sx + z1 * cx;
+  const cz = Math.cos(rz), sz = Math.sin(rz);
+  return { x: x1 * cz - y1 * sz, y: x1 * sz + y1 * cz, z: z2 };
 }
 
-function UniverseScene({
-  progress,
-  pointer,
-  compact,
-  reduced,
-}: {
-  progress: MutableRefObject<number>;
-  pointer: MutableRefObject<{ x: number; y: number }>;
-  compact: boolean;
-  reduced: boolean;
-}) {
-  const data = useMemo(() => makeUniverse(compact ? 17 : 27), [compact]);
-  const glow = useMemo(makeGlow, []);
-  const web = useRef<THREE.Group>(null);
-  const core = useRef<THREE.Group>(null);
-  const rings = useRef<THREE.Group>(null);
-  const edge = useRef<THREE.LineBasicMaterial>(null);
-  const coreGlow = useRef<THREE.SpriteMaterial>(null);
-  const { camera } = useThree();
-  useEffect(() => () => data.edgeGeo.dispose(), [data]);
-  useEffect(() => () => glow.dispose(), [glow]);
-
-  useFrame((s, dt) => {
-    const p = reduced ? 0.58 : smooth(clamp01(progress.current));
-    const t = s.clock.elapsedTime;
-    if (web.current) {
-      web.current.rotation.y = mix(-0.28, 1.85, p) + (reduced ? 0 : t * 0.04) + pointer.current.x * 0.3;
-      web.current.rotation.x = mix(-0.16, 0.2, p) + pointer.current.y * 0.18;
-      web.current.rotation.z = mix(0.04, -0.12, p);
-      web.current.scale.setScalar(mix(0.12, 1.12, p));
-      web.current.position.y = mix(0.12, -0.06, p);
-    }
-    if (core.current) {
-      core.current.rotation.y = t * (reduced ? 0 : 0.14) + p * 0.7;
-      core.current.rotation.z = Math.sin(t * 0.35) * 0.06;
-      core.current.scale.setScalar(mix(0.9, 1.06, p));
-    }
-    if (rings.current) {
-      rings.current.rotation.z = t * (reduced ? 0 : 0.05);
-      rings.current.rotation.x = mix(0.9, 1.3, p);
-    }
-    if (edge.current) edge.current.opacity = mix(0.12, 0.4, p);
-    if (coreGlow.current) coreGlow.current.opacity = mix(0.2, 0.4, p);
-    camera.position.z = mix(7.6, 5.8, p);
-    camera.position.y = mix(0.55, 0.18, p);
-    camera.lookAt(0, 0, 0);
-    if (dt > 0.1) s.clock.getDelta();
-  });
-
-  return (
-    <>
-      <ambientLight intensity={0.7} />
-      <pointLight position={[4, 4, 5]} intensity={2.4} color={LIME} distance={20} decay={2} />
-      <pointLight position={[-5, -2, 2]} intensity={1.8} color={VIOLET} distance={18} decay={2} />
-      <pointLight position={[0, -4, -4]} intensity={1.2} color={ORANGE} distance={16} decay={2} />
-
-      <group ref={core}>
-        <sprite scale={[6.2, 6.2, 1]}>
-          <spriteMaterial ref={coreGlow} map={glow} color={LIME} transparent opacity={0.3} depthWrite={false} blending={THREE.AdditiveBlending} />
-        </sprite>
-        <mesh>
-          <icosahedronGeometry args={[0.55, 8]} />
-          <meshStandardMaterial
-            color="#0B100E"
-            emissive={LIME}
-            emissiveIntensity={0.035}
-            metalness={0.95}
-            roughness={0.14}
-          />
-        </mesh>
-        <mesh scale={1.22}>
-          <icosahedronGeometry args={[0.55, 1]} />
-          <meshBasicMaterial color={LIME} wireframe transparent opacity={0.3} />
-        </mesh>
-        <group ref={rings}>
-          <mesh rotation={[1.1, 0.2, 0]}>
-            <torusGeometry args={[1.65, 0.006, 6, 120]} />
-            <meshBasicMaterial color={LIME} transparent opacity={0.35} blending={THREE.AdditiveBlending} depthWrite={false} />
-          </mesh>
-          <mesh rotation={[0.6, 1.2, 0.3]}>
-            <torusGeometry args={[2.05, 0.004, 6, 120]} />
-            <meshBasicMaterial color={VIOLET} transparent opacity={0.28} blending={THREE.AdditiveBlending} depthWrite={false} />
-          </mesh>
-        </group>
-      </group>
-
-      <group ref={web}>
-        <lineSegments geometry={data.edgeGeo}>
-          <lineBasicMaterial ref={edge} color={LIME} transparent opacity={0.15} blending={THREE.AdditiveBlending} depthWrite={false} />
-        </lineSegments>
-        {data.nodes.map((n, i) => (
-          <group key={i} position={n.pos}>
-            <mesh>
-              <sphereGeometry args={[n.size, 16, 16]} />
-              <meshStandardMaterial color={n.color} emissive={n.color} emissiveIntensity={0.85} metalness={0.2} roughness={0.25} toneMapped={false} />
-            </mesh>
-            <sprite scale={[n.size * 10, n.size * 10, 1]}>
-              <spriteMaterial map={glow} color={n.color} transparent opacity={0.5} depthWrite={false} blending={THREE.AdditiveBlending} />
-            </sprite>
-            {n.label && <NodeLabel text={n.label} color={n.color} progress={progress} position={[n.pos.x * 0.2, n.pos.y * 0.2 + 0.28, n.pos.z * 0.2]} />}
-          </group>
-        ))}
-      </group>
-
-      <Dust glow={glow} compact={compact} reduced={reduced} />
-    </>
-  );
+function makeGlow(color: string) {
+  const c = document.createElement("canvas");
+  c.width = c.height = 96;
+  const g = c.getContext("2d")!;
+  const grad = g.createRadialGradient(48, 48, 0, 48, 48, 48);
+  grad.addColorStop(0, color);
+  grad.addColorStop(0.18, color);
+  grad.addColorStop(0.55, "rgba(0,0,0,0)");
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 96, 96);
+  return c;
 }
 
 export default function ScrollUniverse() {
   const section = useRef<HTMLElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
   const progress = useRef(0);
   const pointer = useRef({ x: 0, y: 0 });
   const [active, setActive] = useState(0);
-  const [inView, setInView] = useState(false);
   const [compact, setCompact] = useState(false);
   const [reduced, setReduced] = useState(false);
-  const [webgl, setWebgl] = useState(false);
 
-  useEffect(() => {
-    try {
-      const c = document.createElement("canvas");
-      setWebgl(Boolean(c.getContext("webgl2") || c.getContext("webgl")));
-    } catch {
-      setWebgl(false);
-    }
+  const data = useMemo(() => makeUniverse(compact ? 17 : 27), [compact]);
+  const dust = useMemo(() => makeDust(compact ? 300 : 680), [compact]);
+  const glows = useMemo(() => {
+    const map: Record<string, HTMLCanvasElement> = {};
+    [LIME, VIOLET, ORANGE, PAPER].forEach((c) => (map[c] = makeGlow(c)));
+    return map;
   }, []);
 
   useEffect(() => {
@@ -383,17 +202,261 @@ export default function ScrollUniverse() {
     update();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll, { passive: true });
-    const io = new IntersectionObserver((entries) => setInView(entries[0]?.isIntersecting ?? false), {
-      rootMargin: "20% 0px",
-    });
-    io.observe(el);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
-      io.disconnect();
     };
   }, []);
+
+  useEffect(() => {
+    const c = canvas.current;
+    if (!c) return;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    let raf = 0;
+    let visible = false;
+    let stopped = false;
+    let W = 0, H = 0, dpr = 1;
+
+    const resize = () => {
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      W = c.clientWidth;
+      H = c.clientHeight;
+      c.width = Math.max(1, Math.round(W * dpr));
+      c.height = Math.max(1, Math.round(H * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    const draw = (now: number) => {
+      const t = now / 1000;
+      const p = reduced ? 0.58 : smooth(clamp01(progress.current));
+      const webScale = mix(0.12, 1.12, p);
+      const ry = mix(-0.28, 1.85, p) + (reduced ? 0 : t * 0.04) + pointer.current.x * 0.3;
+      const rx = mix(-0.16, 0.2, p) + pointer.current.y * 0.18;
+      const rz = mix(0.04, -0.12, p);
+      const camZ = mix(7.6, 5.8, p);
+      const focal = Math.min(W * 1.22, H * 1.42);
+      const cx = W * (compact ? 0.54 : 0.64);
+      const cy = H * (compact ? 0.66 : 0.5);
+
+      const project = (v: V3, scale = 1, rot = { ry, rx, rz }) => {
+        const r = rotate({ x: v.x * scale, y: v.y * scale, z: v.z * scale }, rot.ry, rot.rx, rot.rz);
+        const depth = r.z + camZ;
+        const f = focal / Math.max(0.5, depth);
+        return { x: cx + r.x * f, y: cy + r.y * f, z: depth, f };
+      };
+
+      ctx.clearRect(0, 0, W, H);
+
+      // ambient halo
+      const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W, H) * 0.5);
+      bg.addColorStop(0, "rgba(216,248,94,.075)");
+      bg.addColorStop(0.55, "rgba(156,139,229,.035)");
+      bg.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      // dust
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const dustRot = { ry: t * (reduced ? 0 : 0.012), rx: Math.sin(t * 0.08) * 0.08, rz: 0 };
+      dust.forEach((v, i) => {
+        const s = project(v, 1, dustRot);
+        if (s.z <= 0.5) return;
+        const a = clamp01((1 - s.z / 12)) * (reduced ? 0.3 : 0.38);
+        ctx.globalAlpha = a * (i % 7 === 0 ? 1.4 : 0.75);
+        const r = Math.max(0.5, Math.min(2.2, 14 / s.z));
+        ctx.drawImage(glows[PAPER], s.x - r * 2, s.y - r * 2, r * 4, r * 4);
+      });
+      ctx.restore();
+
+      // orbit rings
+      const ringGroups = [
+        { radius: 1.65, color: LIME, tilt: [0.9 + p * 0.4, 0.2, 0.2 + t * (reduced ? 0 : 0.05)] },
+        { radius: 2.05, color: VIOLET, tilt: [0.6 + p * 0.5, 1.2, 0.3 - t * (reduced ? 0 : 0.035)] },
+      ];
+      ringGroups.forEach((ring) => {
+        const rot = { ry: ring.tilt[2], rx: ring.tilt[0], rz: ring.tilt[1] };
+        ctx.beginPath();
+        RING.forEach((v, i) => {
+          const s = project({ x: v.x * ring.radius, y: v.y * ring.radius, z: v.z }, 1, rot);
+          if (i === 0) ctx.moveTo(s.x, s.y);
+          else ctx.lineTo(s.x, s.y);
+        });
+        ctx.strokeStyle = ring.color;
+        ctx.globalAlpha = 0.24;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      });
+
+      // core
+      const coreScale = mix(0.9, 1.06, p);
+      const coreRot = { ry: (reduced ? 0 : t * 0.14) + p * 0.7, rx: Math.sin(t * 0.35) * 0.06, rz: 0 };
+      const coreCenter = project({ x: 0, y: 0, z: 0 });
+      const coreR = 0.5 * coreCenter.f * coreScale;
+      const glow = ctx.createRadialGradient(coreCenter.x, coreCenter.y, coreR * 0.2, coreCenter.x, coreCenter.y, coreR * 2.6);
+      glow.addColorStop(0, "rgba(216,248,94,.11)");
+      glow.addColorStop(0.45, "rgba(216,248,94,.045)");
+      glow.addColorStop(1, "rgba(216,248,94,0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(coreCenter.x, coreCenter.y, coreR * 2.6, 0, Math.PI * 2);
+      ctx.fill();
+
+      const sphere = ctx.createRadialGradient(
+        coreCenter.x - coreR * 0.34,
+        coreCenter.y - coreR * 0.36,
+        coreR * 0.05,
+        coreCenter.x,
+        coreCenter.y,
+        coreR,
+      );
+      sphere.addColorStop(0, "#F2FFB4");
+      sphere.addColorStop(0.2, "#D8F85E");
+      sphere.addColorStop(0.58, "#4C5A1D");
+      sphere.addColorStop(1, "#0B100E");
+      ctx.fillStyle = sphere;
+      ctx.beginPath();
+      ctx.arc(coreCenter.x, coreCenter.y, coreR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // core wireframe
+      const coreVerts = CORE.verts.map((v) => project({ x: v.x * 0.62 * coreScale, y: v.y * 0.62 * coreScale, z: v.z * 0.62 * coreScale }, 1, coreRot));
+      ctx.strokeStyle = LIME;
+      ctx.globalAlpha = 0.3;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      CORE.edges.forEach(([a, b]) => {
+        ctx.moveTo(coreVerts[a].x, coreVerts[a].y);
+        ctx.lineTo(coreVerts[b].x, coreVerts[b].y);
+      });
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // edges
+      const edgeAlpha = mix(0.12, 0.45, p);
+      const projected = data.nodes.map((n) => project(n.pos, webScale));
+      const orderedEdges = data.edges
+        .map(([a, b]) => ({ a, b, z: (projected[a].z + projected[b].z) / 2 }))
+        .sort((x, y) => y.z - x.z);
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      orderedEdges.forEach(({ a, b }) => {
+        const A = projected[a], B = projected[b];
+        const alpha = edgeAlpha * clamp01(1.4 - (A.z + B.z) / 18);
+        ctx.strokeStyle = `rgba(216,248,94,${alpha})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(A.x, A.y);
+        ctx.lineTo(B.x, B.y);
+        ctx.stroke();
+        ctx.strokeStyle = `rgba(216,248,94,${alpha * 0.18})`;
+        ctx.lineWidth = 3.2;
+        ctx.stroke();
+      });
+      ctx.restore();
+
+      // nodes
+      const orderedNodes = data.nodes
+        .map((n, i) => ({ n, i, z: projected[i].z }))
+        .sort((a, b) => b.z - a.z);
+      orderedNodes.forEach(({ n, i }) => {
+        const s = projected[i];
+        if (s.z <= 0.5) return;
+        const r = Math.max(1.1, n.size * s.f * 0.98);
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 0.22;
+        const g = glows[n.color] || glows[PAPER];
+        ctx.drawImage(g, s.x - r * 3, s.y - r * 3, r * 6, r * 6);
+        ctx.restore();
+
+        const grad = ctx.createRadialGradient(s.x - r * 0.34, s.y - r * 0.36, r * 0.08, s.x, s.y, r);
+        grad.addColorStop(0, "rgba(255,255,255,.7)");
+        grad.addColorStop(0.36, n.color);
+        grad.addColorStop(1, "rgba(8,11,11,.92)");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // labels — only in the safe copy-free zone, never overlapping each other
+      const reveal = clamp01((p - 0.28) / 0.3);
+      if (reveal > 0.02) {
+        const placed: { x: number; y: number; w: number; h: number }[] = [];
+        ctx.font = "700 11px Manrope, Inter, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        data.nodes.forEach((n, i) => {
+          if (!n.label) return;
+          const base = projected[i];
+          if (base.z <= 0.5) return;
+          const dir = Math.hypot(n.pos.x, n.pos.y, n.pos.z) || 1;
+          const s = project({ x: n.pos.x + (n.pos.x / dir) * 0.6, y: n.pos.y + (n.pos.y / dir) * 0.6 + 0.2, z: n.pos.z + (n.pos.z / dir) * 0.6 }, webScale);
+          const safeX = compact ? W * 0.06 : W * 0.43;
+          const minY = compact ? H * 0.66 : H * 0.12;
+          const safe = s.x > safeX && s.y > minY && s.y < H * 0.9;
+          if (!safe) return;
+          const tw = ctx.measureText(n.label.toUpperCase()).width + 18;
+          const rect = { x: s.x - tw / 2, y: s.y - 11, w: tw, h: 22 };
+          if (placed.some((r) => rect.x < r.x + r.w + 4 && rect.x + rect.w + 4 > r.x && rect.y < r.y + r.h + 4 && rect.y + rect.h + 4 > r.y)) return;
+          placed.push(rect);
+          ctx.globalAlpha = reveal * 0.8;
+          ctx.beginPath();
+          ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 11);
+          ctx.fillStyle = "rgba(8,11,11,.86)";
+          ctx.fill();
+          ctx.strokeStyle = n.color;
+          ctx.globalAlpha = reveal * 0.45;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.globalAlpha = reveal * 0.86;
+          ctx.fillStyle = "#EAF1DD";
+          ctx.fillText(n.label.toUpperCase(), s.x, s.y + 0.5);
+          ctx.globalAlpha = 1;
+        });
+      }
+    };
+
+    const loop = (now: number) => {
+      draw(now);
+      raf = !stopped && visible && !reduced ? requestAnimationFrame(loop) : 0;
+    };
+    const start = () => {
+      if (reduced || raf) return;
+      raf = requestAnimationFrame(loop);
+    };
+    const stop = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+    };
+    const onVisibility = () => {
+      if (document.hidden) stop();
+      else if (visible) start();
+    };
+
+    resize();
+    draw(performance.now());
+    const io = new IntersectionObserver(([entry]) => {
+      visible = entry?.isIntersecting ?? false;
+      if (visible) start();
+      else stop();
+    }, { rootMargin: "20% 0px" });
+    io.observe(c);
+    window.addEventListener("resize", resize);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      stopped = true;
+      stop();
+      io.disconnect();
+      window.removeEventListener("resize", resize);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [data, dust, glows, compact, reduced]);
 
   const onPointer = (e: ReactPointerEvent) => {
     if (reduced) return;
@@ -406,20 +469,7 @@ export default function ScrollUniverse() {
     <section className="lp-universe" id="universe" ref={section} onPointerMove={onPointer}>
       <div className="lp-universe-sticky">
         <div className="lp-universe-stage" aria-hidden="true">
-          {webgl ? (
-            <SceneBoundary>
-              <Canvas
-                dpr={[1, compact ? 1.35 : 1.6]}
-                camera={{ position: [0, 0.55, 7.6], fov: compact ? 54 : 46 }}
-                gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
-                frameloop={inView ? "always" : "never"}
-              >
-                <UniverseScene progress={progress} pointer={pointer} compact={compact} reduced={reduced} />
-              </Canvas>
-            </SceneBoundary>
-          ) : (
-            <UniverseFallback />
-          )}
+          <canvas ref={canvas} className="lp-u-canvas" />
         </div>
         <div className="lp-universe-scrim" aria-hidden="true" />
         <div className="lp-universe-inner">
