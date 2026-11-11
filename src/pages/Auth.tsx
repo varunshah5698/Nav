@@ -339,7 +339,8 @@ function GoogleButton({ mode, next }: { mode: Mode; next: string | null }) {
     setErr("");
     setBusy(true);
     try {
-      await signIn("google", { redirectTo: next || "/app/dashboard" });
+      const target = next || "/app/dashboard";
+      await signIn("google", { redirectTo: `${window.location.origin}${target}` });
     } catch (e) {
       setErr(authErrorMessage(e, mode === "register"));
       setBusy(false);
