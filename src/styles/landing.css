@@ -45,8 +45,8 @@
 .lp-head.is-stuck {
   color: #f2f5f3;
   background: rgba(11, 14, 14, 0.72);
-  backdrop-filter: blur(18px) saturate(150%);
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
   border-bottom-color: rgba(255, 255, 255, 0.09);
 }
 
@@ -1566,6 +1566,14 @@
   position: absolute;
   inset: 0;
   z-index: 0;
+  contain: layout paint;
+  transform: translateZ(0);
+}
+
+@media (min-width: 900px) {
+  .lp-universe-stage {
+    left: 26%;
+  }
 }
 
 .lp-universe-stage canvas {
@@ -1574,16 +1582,7 @@
   height: 100% !important;
 }
 
-.lp-universe-stage::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-  background-size: 34px 34px;
-  mask-image: radial-gradient(70% 70% at 64% 48%, #000, transparent 78%);
-  -webkit-mask-image: radial-gradient(70% 70% at 64% 48%, #000, transparent 78%);
-}
+
 
 .lp-universe-scrim {
   position: absolute;
@@ -1663,10 +1662,13 @@
   left: -1px;
   top: 0;
   width: 2px;
-  height: calc(var(--u-progress) * 100%);
+  height: 100%;
   border-radius: 2px;
   background: linear-gradient(180deg, var(--lp-lime), var(--lp-violet));
   opacity: 0.8;
+  transform: scaleY(var(--u-progress));
+  transform-origin: top center;
+  will-change: transform;
 }
 
 .lp-u-steps li {
@@ -1760,11 +1762,13 @@
 
 .lp-u-bar i {
   display: block;
-  width: calc(var(--u-progress) * 100%);
+  width: 100%;
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--lp-lime), var(--lp-violet));
-  transition: width 0.14s linear;
+  transform: scaleX(var(--u-progress));
+  transform-origin: left center;
+  will-change: transform;
 }
 
 @media (max-width: 900px) {

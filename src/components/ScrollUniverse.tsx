@@ -135,18 +135,62 @@ function rotate(v: V3, ry: number, rx: number, rz: number) {
   return { x: x1 * cz - y1 * sz, y: x1 * sz + y1 * cz, z: z2 };
 }
 
-function makeGlow(color: string) {
-  const c = document.createElement("canvas");
-  c.width = c.height = 96;
-  const g = c.getContext("2d")!;
-  const grad = g.createRadialGradient(48, 48, 0, 48, 48, 48);
-  grad.addColorStop(0, color);
-  grad.addColorStop(0.18, color);
-  grad.addColorStop(0.55, "rgba(0,0,0,0)");
-  grad.addColorStop(1, "rgba(0,0,0,0)");
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 96, 96);
-  return c;
+function withAlpha(hex: string, alpha: number) {
+  const h = hex.replace("#", "");
+  const v = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const r = parseInt(v.slice(0, 2), 16);
+  const g = parseInt(v.slice(2, 4), 16);
+  const b = parseInt(v.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function makeNodeSprite(color: string) {
+  const size = 128;
+  const c = size / 2;
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = size;
+  const g = cv.getContext("2d")!;
+  const glow = g.createRadialGradient(c, c, 0, c, c, c);
+  glow.addColorStop(0, withAlpha(color, 0.42));
+  glow.addColorStop(0.35, withAlpha(color, 0.1));
+  glow.addColorStop(1, withAlpha(color, 0));
+  g.fillStyle = glow;
+  g.fillRect(0, 0, size, size);
+  const r = 22;
+  const sphere = g.createRadialGradient(c - r * 0.35, c - r * 0.35, r * 0.08, c, c, r);
+  sphere.addColorStop(0, "rgba(255,255,255,.82)");
+  sphere.addColorStop(0.36, color);
+  sphere.addColorStop(1, "rgba(8,11,11,.95)");
+  g.fillStyle = sphere;
+  g.beginPath();
+  g.arc(c, c, r, 0, Math.PI * 2);
+  g.fill();
+  return { canvas: cv, scale: size / r };
+}
+
+function makeCoreSprite() {
+  const size = 256;
+  const c = size / 2;
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = size;
+  const g = cv.getContext("2d")!;
+  const glow = g.createRadialGradient(c, c, 0, c, c, c);
+  glow.addColorStop(0, "rgba(216,248,94,.22)");
+  glow.addColorStop(0.35, "rgba(216,248,94,.07)");
+  glow.addColorStop(1, "rgba(216,248,94,0)");
+  g.fillStyle = glow;
+  g.fillRect(0, 0, size, size);
+  const r = 92;
+  const sphere = g.createRadialGradient(c - r * 0.34, c - r * 0.36, r * 0.05, c, c, r);
+  sphere.addColorStop(0, "#F2FFB4");
+  sphere.addColorStop(0.2, "#D8F85E");
+  sphere.addColorStop(0.58, "#4C5A1D");
+  sphere.addColorStop(1, "#0B100E");
+  g.fillStyle = sphere;
+  g.beginPath();
+  g.arc(c, c, r, 0, Math.PI * 2);
+  g.fill();
+  return { canvas: cv, scale: size / r };
 }
 
 export default function ScrollUniverse() {
@@ -159,12 +203,13 @@ export default function ScrollUniverse() {
   const [reduced, setReduced] = useState(false);
 
   const data = useMemo(() => makeUniverse(compact ? 17 : 27), [compact]);
-  const dust = useMemo(() => makeDust(compact ? 300 : 680), [compact]);
-  const glows = useMemo(() => {
-    const map: Record<string, HTMLCanvasElement> = {};
-    [LIME, VIOLET, ORANGE, PAPER].forEach((c) => (map[c] = makeGlow(c)));
+  const dust = useMemo(() => makeDust(compact ? 140 : 320), [compact]);
+  const nodeSprites = useMemo(() => {
+    const map: Record<string, { canvas: HTMLCanvasElement; scale: number }> = {};
+    [LIME, VIOLET, ORANGE, PAPER].forEach((c) => (map[c] = makeNodeSprite(c)));
     return map;
   }, []);
+  const coreSprite = useMemo(makeCoreSprite, []);
 
   useEffect(() => {
     const mqCompact = window.matchMedia("(max-width: 760px)");
@@ -185,9 +230,7 @@ export default function ScrollUniverse() {
   useEffect(() => {
     const el = section.current;
     if (!el) return;
-    let raf = 0;
     const update = () => {
-      raf = 0;
       const rect = el.getBoundingClientRect();
       const total = Math.max(1, rect.height - window.innerHeight);
       const p = clamp01(-rect.top / total);
@@ -196,23 +239,19 @@ export default function ScrollUniverse() {
       const next = p < 0.34 ? 0 : p < 0.7 ? 1 : 2;
       setActive((cur) => (cur === next ? cur : next));
     };
-    const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(update);
-    };
     update();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update, { passive: true });
     return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
     };
   }, []);
 
   useEffect(() => {
     const c = canvas.current;
     if (!c) return;
-    const ctx = c.getContext("2d");
+    const ctx = c.getContext("2d", { alpha: true, desynchronized: true });
     if (!ctx) return;
     let raf = 0;
     let visible = false;
@@ -220,7 +259,7 @@ export default function ScrollUniverse() {
     let W = 0, H = 0, dpr = 1;
 
     const resize = () => {
-      dpr = Math.min(2, window.devicePixelRatio || 1);
+      dpr = Math.min(compact ? 1.15 : 1.25, window.devicePixelRatio || 1);
       W = c.clientWidth;
       H = c.clientHeight;
       c.width = Math.max(1, Math.round(W * dpr));
@@ -236,8 +275,8 @@ export default function ScrollUniverse() {
       const rx = mix(-0.16, 0.2, p) + pointer.current.y * 0.18;
       const rz = mix(0.04, -0.12, p);
       const camZ = mix(7.6, 5.8, p);
-      const focal = Math.min(W * 1.22, H * 1.42);
-      const cx = W * (compact ? 0.54 : 0.64);
+      const focal = Math.min(W * 1.45, H * 1.42);
+      const cx = W * (compact ? 0.54 : 0.51);
       const cy = H * (compact ? 0.66 : 0.5);
 
       const project = (v: V3, scale = 1, rot = { ry, rx, rz }) => {
@@ -249,25 +288,17 @@ export default function ScrollUniverse() {
 
       ctx.clearRect(0, 0, W, H);
 
-      // ambient halo
-      const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W, H) * 0.5);
-      bg.addColorStop(0, "rgba(216,248,94,.075)");
-      bg.addColorStop(0.55, "rgba(156,139,229,.035)");
-      bg.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, W, H);
-
       // dust
+      const dustRot = { ry: t * (reduced ? 0 : 0.012), rx: Math.sin(t * 0.08) * 0.08, rz: 0 };
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      const dustRot = { ry: t * (reduced ? 0 : 0.012), rx: Math.sin(t * 0.08) * 0.08, rz: 0 };
-      dust.forEach((v, i) => {
+      ctx.globalAlpha = 0.38;
+      ctx.fillStyle = "#E8E4DA";
+      dust.forEach((v) => {
         const s = project(v, 1, dustRot);
-        if (s.z <= 0.5) return;
-        const a = clamp01((1 - s.z / 12)) * (reduced ? 0.3 : 0.38);
-        ctx.globalAlpha = a * (i % 7 === 0 ? 1.4 : 0.75);
-        const r = Math.max(0.5, Math.min(2.2, 14 / s.z));
-        ctx.drawImage(glows[PAPER], s.x - r * 2, s.y - r * 2, r * 4, r * 4);
+        if (s.z <= 0.5 || s.x < -20 || s.x > W + 20 || s.y < -20 || s.y > H + 20) return;
+        const r = Math.max(0.6, Math.min(1.8, 12 / s.z));
+        ctx.fillRect(s.x, s.y, r, r);
       });
       ctx.restore();
 
@@ -296,31 +327,8 @@ export default function ScrollUniverse() {
       const coreRot = { ry: (reduced ? 0 : t * 0.14) + p * 0.7, rx: Math.sin(t * 0.35) * 0.06, rz: 0 };
       const coreCenter = project({ x: 0, y: 0, z: 0 });
       const coreR = 0.5 * coreCenter.f * coreScale;
-      const glow = ctx.createRadialGradient(coreCenter.x, coreCenter.y, coreR * 0.2, coreCenter.x, coreCenter.y, coreR * 2.6);
-      glow.addColorStop(0, "rgba(216,248,94,.11)");
-      glow.addColorStop(0.45, "rgba(216,248,94,.045)");
-      glow.addColorStop(1, "rgba(216,248,94,0)");
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(coreCenter.x, coreCenter.y, coreR * 2.6, 0, Math.PI * 2);
-      ctx.fill();
-
-      const sphere = ctx.createRadialGradient(
-        coreCenter.x - coreR * 0.34,
-        coreCenter.y - coreR * 0.36,
-        coreR * 0.05,
-        coreCenter.x,
-        coreCenter.y,
-        coreR,
-      );
-      sphere.addColorStop(0, "#F2FFB4");
-      sphere.addColorStop(0.2, "#D8F85E");
-      sphere.addColorStop(0.58, "#4C5A1D");
-      sphere.addColorStop(1, "#0B100E");
-      ctx.fillStyle = sphere;
-      ctx.beginPath();
-      ctx.arc(coreCenter.x, coreCenter.y, coreR, 0, Math.PI * 2);
-      ctx.fill();
+      const coreS = coreR * coreSprite.scale;
+      ctx.drawImage(coreSprite.canvas, coreCenter.x - coreS / 2, coreCenter.y - coreS / 2, coreS, coreS);
 
       // core wireframe
       const coreVerts = CORE.verts.map((v) => project({ x: v.x * 0.62 * coreScale, y: v.y * 0.62 * coreScale, z: v.z * 0.62 * coreScale }, 1, coreRot));
@@ -347,13 +355,10 @@ export default function ScrollUniverse() {
         const A = projected[a], B = projected[b];
         const alpha = edgeAlpha * clamp01(1.4 - (A.z + B.z) / 18);
         ctx.strokeStyle = `rgba(216,248,94,${alpha})`;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1.1;
         ctx.beginPath();
         ctx.moveTo(A.x, A.y);
         ctx.lineTo(B.x, B.y);
-        ctx.stroke();
-        ctx.strokeStyle = `rgba(216,248,94,${alpha * 0.18})`;
-        ctx.lineWidth = 3.2;
         ctx.stroke();
       });
       ctx.restore();
@@ -364,23 +369,11 @@ export default function ScrollUniverse() {
         .sort((a, b) => b.z - a.z);
       orderedNodes.forEach(({ n, i }) => {
         const s = projected[i];
-        if (s.z <= 0.5) return;
+        if (s.z <= 0.5 || s.x < -80 || s.x > W + 80 || s.y < -80 || s.y > H + 80) return;
         const r = Math.max(1.1, n.size * s.f * 0.98);
-        ctx.save();
-        ctx.globalCompositeOperation = "lighter";
-        ctx.globalAlpha = 0.22;
-        const g = glows[n.color] || glows[PAPER];
-        ctx.drawImage(g, s.x - r * 3, s.y - r * 3, r * 6, r * 6);
-        ctx.restore();
-
-        const grad = ctx.createRadialGradient(s.x - r * 0.34, s.y - r * 0.36, r * 0.08, s.x, s.y, r);
-        grad.addColorStop(0, "rgba(255,255,255,.7)");
-        grad.addColorStop(0.36, n.color);
-        grad.addColorStop(1, "rgba(8,11,11,.92)");
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
-        ctx.fill();
+        const sprite = nodeSprites[n.color] || nodeSprites[PAPER];
+        const size = r * sprite.scale;
+        ctx.drawImage(sprite.canvas, s.x - size / 2, s.y - size / 2, size, size);
       });
 
       // labels — only in the safe copy-free zone, never overlapping each other
@@ -456,7 +449,7 @@ export default function ScrollUniverse() {
       window.removeEventListener("resize", resize);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [data, dust, glows, compact, reduced]);
+  }, [data, dust, nodeSprites, coreSprite, compact, reduced]);
 
   const onPointer = (e: ReactPointerEvent) => {
     if (reduced) return;
